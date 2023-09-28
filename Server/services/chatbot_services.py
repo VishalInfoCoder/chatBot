@@ -62,3 +62,15 @@ def get_all_ChatBot():
     except Exception as e:
         print(e)
         return make_response({'message': str(e)}, 404)
+def edit_ChatBot(editdata):
+    try:
+        myResponse=[]
+        isBot = chatBots.objects[:1](id=editdata['id'],user_id=session['user_id'])
+        if not isBot:
+            return {"message": "User does not exists","status":False}
+        else: 
+            isBot.update(name=editdata['name'])
+            return make_response({'message': 'Succesfully Edited',"status":True}, 200) 
+    except Exception as e:
+        print(e)
+        return make_response({'message': str(e)}, 404)
