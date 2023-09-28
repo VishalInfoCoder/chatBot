@@ -68,6 +68,7 @@ def razorPayInitiate(transaction_details):
     # Get the order ID from the response
      
     return order
+
 def view_all_plans():
     try:
         myResponse=[]
