@@ -45,3 +45,8 @@ docker-compose.yml
 
 # Node.js-related files (if using JavaScript or Node.js in your project)
 node_modules/
+# Exclude document files
+*.pdf
+*.doc
+*.docx
+*.txt

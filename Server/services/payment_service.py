@@ -7,7 +7,6 @@ import datetime
 import razorpay
 def initiate_transaction(transaction_data):
     try:
-       
         plan_data=Plans.objects[:1](id=transaction_data['plan_id'])
         if plan_data:
             transaction_details={}
@@ -69,3 +68,24 @@ def razorPayInitiate(transaction_details):
     # Get the order ID from the response
      
     return order
+def view_all_plans():
+    try:
+        myResponse=[]
+        my_plans=Plans.objects()
+        if not my_plans:
+            return {"message": "Plans Not Found","status":False}
+        else:
+            for plan in my_plans:
+                    plan_data = {}
+                    plan_data['_id'] = str(plan.id)
+                    plan_data['price'] = plan.price
+                    plan_data['validity'] = plan.validity
+                    plan_data['description'] = plan.description
+                    plan_data['title'] = plan.title
+                    plan_data['questions'] = plan.questions
+                    plan_data['created'] = plan.created
+                    myResponse.append(plan_data)          
+            return make_response({"data":myResponse,"status":True}, 200)        
+    except Exception as e:
+        print(e)
+        return make_response({'message': str(e)}, 404)    

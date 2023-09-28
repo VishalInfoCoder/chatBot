@@ -6,6 +6,6 @@ class Plans(Document):
     validity=StringField(required=True, max_length=40)
     description=StringField(required=True, max_length=40)
     title=StringField(required=True, max_length=24)
-    messages=StringField(required=True, max_length=24)
+    questions=StringField(required=True, max_length=24)
     created = DateTimeField(default=datetime.datetime.utcnow)
     updated = DateTimeField(default=datetime.datetime.utcnow)

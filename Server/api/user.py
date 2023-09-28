@@ -1,5 +1,5 @@
 from flask import Blueprint, request
-from services.user_service import signup_service,login_service,edit_user,get_user,get_all_user
+from services.user_service import signup_service,login_service,edit_user,get_user,get_all_user,update_userStatus
 user_route = Blueprint('user_route', __name__)
 from utils.JwtToken import validate_token_admin
 
@@ -31,3 +31,8 @@ def getUser():
 def getAllUser():
     data = request.get_json() 
     return get_all_user(data)
+@user_route.route("/api/v1/user/updateUserStatus", methods=['POST'])
+@validate_token_admin
+def updateUserStatus():
+    data = request.get_json() 
+    return update_userStatus(data)

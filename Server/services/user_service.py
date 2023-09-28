@@ -89,7 +89,7 @@ def get_all_user(viewdata):
         
         is_user = Users.objects(role="ADMIN")
         if not is_user:
-            return {"status": 404, "message": "User does not exists"}
+            return {"status": False, "message": "No Users Found"}
         else: 
             for user in is_user:
                 user_data = {}
@@ -106,7 +106,7 @@ def update_userStatus(viewdata):
     try:
         is_user = Users.objects[:1](id=viewdata['id'])
         if not is_user:
-            return {"status": 404, "message": "User does not exists"}
+            return {"status": False, "message": "User does not exists"}
         else: 
             if(is_user.is_Active==0):
                 is_user.update(is_Active=1)
