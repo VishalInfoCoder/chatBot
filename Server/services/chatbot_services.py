@@ -40,3 +40,25 @@ def get_ChatBot(botdata):
     except Exception as e:
         print(e)
         return make_response({'message': str(e)}, 404)
+def get_all_ChatBot():
+    try:
+        myResponse=[]
+        isBot = chatBots.objects(user_id=session['user_id'])
+        if not isBot:
+            return {"message": "User does not exists","status":False}
+        else: 
+            for bot in isBot:
+                bot_data = {}
+                bot_data['_id'] = str(bot.id)
+                bot_data['user_id'] = str(bot.user_id)
+                bot_data['name'] = bot.name
+                bot_data['text'] = bot.text
+                bot_data['validityStartDate'] = bot.validityStartDate
+                bot_data['validityEndDate'] = bot.validityEndDate
+                bot_data['questions'] = bot.questions
+                bot_data['created'] = bot.created.isoformat()
+                myResponse.append(bot_data)
+                return make_response({"data":myResponse,"status":True}, 200)    
+    except Exception as e:
+        print(e)
+        return make_response({'message': str(e)}, 404)
