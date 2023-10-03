@@ -52,19 +52,24 @@ def validate_apiKey(func):
             if not isBot:
                 return {"message": "chatBot does not exists","status":False}
             else:
-                
-                bot_data = {}
-                bot_data['name'] = isBot.name
-                # bot_data['text'] = [{'_id': str(item['_id']), 'text_data': item['text_data'], 'title': item['title'], 'user_id': item['user_id']} for item in bot.text]
-                bot_data['validityStartDate'] = isBot.validityStartDate
-                bot_data['validityEndDate'] = isBot.validityEndDate
-                bot_data['questions'] = isBot.questions
-                bot_data['avatar_image']=os.environ.get('url')+isBot.avatar_image 
-                bot_data['created'] = isBot.created.isoformat() 
-                bot_data['user_id'] = str(isBot.user_id )
-                bot_data['key'] = str(isBot.key)
-                session['myBot'] = bot_data
-                return func(*args, **kwargs)
+                current_time=datetime.datetime.utcnow()
+                print(current_time)
+                if(isBot.validityEndDate>current_time):
+                    bot_data = {}
+                    bot_data['name'] = isBot.name
+                    # bot_data['text'] = [{'_id': str(item['_id']), 'text_data': item['text_data'], 'title': item['title'], 'user_id': item['user_id']} for item in bot.text]
+                    bot_data['validityStartDate'] = isBot.validityStartDate
+                    bot_data['validityEndDate'] = isBot.validityEndDate
+                    bot_data['questions'] = isBot.questions
+                    if isBot.avatar_image :
+                        bot_data['avatar_image']=os.environ.get('url')+isBot.avatar_image  
+                    bot_data['created'] = isBot.created.isoformat() 
+                    bot_data['user_id'] = str(isBot.user_id )
+                    bot_data['key'] = str(isBot.key)
+                    session['myBot'] = bot_data
+                    return func(*args, **kwargs)
+                else:
+                    return {"message": "Validity Expired","status":False}
         except Exception as e: 
             print(e)
             return make_response({"message": "Invalid token provided","status":False})   
