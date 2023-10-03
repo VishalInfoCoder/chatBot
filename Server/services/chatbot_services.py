@@ -22,11 +22,15 @@ from langchain.prompts.prompt import PromptTemplate
 from langchain.chat_models import ChatOpenAI
 from langchain.chains import LLMChain
 from langchain.llms import AzureOpenAI
-import openai
+import openai 
 from langchain.embeddings.openai import OpenAIEmbeddings
 
 
-
+os.environ["OPENAI_API_TYPE"] = "azure"
+os.environ["OPENAI_API_VERSION"] = "2023-05-15"
+os.environ["OPENAI_API_BASE"] = "https://ai-ramsol-traning.openai.azure.com/"
+os.environ["OPENAI_API_KEY"] = "5b60d2473952443cafceeee0b2797cf4"
+os.environ["HUGGINGFACEHUB_API_TOKEN"] = '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'
 
    
 openai_ef = embedding_functions.OpenAIEmbeddingFunction(
@@ -34,13 +38,11 @@ openai_ef = embedding_functions.OpenAIEmbeddingFunction(
                  api_base="https://ai-ramsol-traning.openai.azure.com/",
                  api_type="azure",
                  api_version="2023-05-15",
-                 model_name="embedding-dev"
-            )
+                 model_name="embedding-dev")
 
 def get_Answer(data):
     try:
         theBot=session['myBot']
-        print(theBot)
         isUser = userChatHistory.objects[:1](email=data['email'],user_id=theBot['user_id']).first()
         if not isUser:
             isUser=userChatHistory(email=data['email'],history=[],user_id=theBot['user_id'])
@@ -57,6 +59,7 @@ def get_Answer(data):
                     deployment="embedding-dev",
                     model="text-embedding-ada-002"
                 )
+        print(theBot['key'])
         db4 = Chroma(client=client, collection_name=theBot['key'], embedding_function=embedding_function)
         
         
@@ -76,7 +79,6 @@ def get_Answer(data):
                 deployment_id="Ai-training-example",   
                 model_name="gpt-35-turbo", 
                 temperature=0.5,
-            
             )
         
         memory=ConversationBufferMemory(memory_key='chat_history', return_messages=True)
@@ -97,6 +99,7 @@ def get_Answer(data):
         saveData['answer'] = result['answer']
         isUser.history.append(saveData)
         isUser.save()
+        updateBot(theBot)
         return make_response({'message':result['answer'] ,"status":True}) 
     except Exception as e:
         print(e)
@@ -158,7 +161,7 @@ def get_ChatBot(botdata):
                 bot_data['used_characters']=bot.used_characters
                 bot_data['allowed_characters']=bot.allowed_characters 
                 bot_data['key']=bot.key 
-                bot_data['avatar_image']=bot.avatar_image 
+                bot_data['avatar_image']=os.environ.get('url')+bot.avatar_image 
                 bot_data['created'] = bot.created.isoformat()
                
                 myResponse.append(bot_data)
@@ -305,3 +308,12 @@ def get_chatBot_Bykey():
     except Exception as e:
             print(e)
             return make_response({'message': str(e)}, 404) 
+    
+def updateBot(data):
+    isBot = chatBots.objects[:1](user_id=data['user_id'],key=data['key']).first()
+    if not isBot:
+        return {"message": "chatBot does not exists","status":False}
+    else:
+        isBot.questions=isBot.questions-1
+        isBot.save()
+            

@@ -18,7 +18,7 @@ def generate_token(payload, secret):
     return token
 
 def validate_token_admin(func):
-    secret = os.environ.get('TOKEN_SECRET')
+    secret = "qwertyuioplkmjnha5526735gbsgsg"
     def wrapper(*args, **kwargs):
         try:
             token = request.headers['Authorization']
@@ -59,9 +59,10 @@ def validate_apiKey(func):
                 bot_data['validityStartDate'] = isBot.validityStartDate
                 bot_data['validityEndDate'] = isBot.validityEndDate
                 bot_data['questions'] = isBot.questions
-                bot_data['avatar_image']=isBot.avatar_image
+                bot_data['avatar_image']=os.environ.get('url')+isBot.avatar_image 
                 bot_data['created'] = isBot.created.isoformat() 
                 bot_data['user_id'] = str(isBot.user_id )
+                bot_data['key'] = str(isBot.key)
                 session['myBot'] = bot_data
                 return func(*args, **kwargs)
         except Exception as e: 

@@ -4,17 +4,12 @@ from flask_cors import CORS
 from api.user import user_route 
 from api.payment import payment_route
 from api.chatbot import chatbot_route
-from api.directory import static_bp
 from mongoengine import connect 
+from api.directory import static_bp
 from dotenv import load_dotenv 
 load_dotenv()
-
-os.environ["OPENAI_API_TYPE"] = "azure"
-os.environ["OPENAI_API_VERSION"] = "2023-05-15"
-os.environ["OPENAI_API_BASE"] = "https://ai-ramsol-traning.openai.azure.com/"
-os.environ["OPENAI_API_KEY"] = "5b60d2473952443cafceeee0b2797cf4"
-os.environ["HUGGINGFACEHUB_API_TOKEN"] = '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'
 secret = os.environ.get('TOKEN_SECRET')
+
 app = Flask(__name__) 
 app.register_blueprint(user_route)
 app.register_blueprint(payment_route)
