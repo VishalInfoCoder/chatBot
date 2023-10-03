@@ -106,7 +106,7 @@ def view_all_plans():
                     plan_data['questions'] = plan.questions
                     plan_data['created'] = plan.created
                     myResponse.append(plan_data)      
-                    myResponse.insert(0, myResponse.pop())    
+            myResponse.insert(0, myResponse.pop())    
             return make_response({"data":myResponse,"status":True}, 200)        
     except Exception as e:
         print(e)
