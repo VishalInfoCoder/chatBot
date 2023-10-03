@@ -7,5 +7,6 @@ class Plans(Document):
     description=StringField(required=True, max_length=40)
     title=StringField(required=True, max_length=24)
     questions=StringField(required=True, max_length=24)
+    token_limit=StringField(required=True, max_length=24)
     created = DateTimeField(default=datetime.datetime.utcnow)
     updated = DateTimeField(default=datetime.datetime.utcnow)

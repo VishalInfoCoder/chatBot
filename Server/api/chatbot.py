@@ -1,5 +1,5 @@
 from flask import Blueprint, request
-from services.chatbot_services import add_ChatBot,get_ChatBot,get_all_ChatBot,edit_ChatBot
+from services.chatbot_services import add_ChatBot,get_ChatBot,get_all_ChatBot,edit_ChatBot,add_ChatBot_text,get_ChatBot_text,delete_ChatBot_text
 chatbot_route = Blueprint('chatbot_route', __name__)
 from utils.JwtToken import validate_token_admin
 
@@ -24,3 +24,18 @@ def getAllChatBot():
 def editChatBot():
     data = request.get_json()
     return edit_ChatBot(data)
+@chatbot_route.route("/api/v1/chatbot/addChatBotText", methods=['POST'])
+@validate_token_admin
+def addChatBotText():
+    data = request.get_json()
+    return add_ChatBot_text(data)
+@chatbot_route.route("/api/v1/chatbot/getChatBotText", methods=['POST'])
+@validate_token_admin
+def getChatBotText():
+    data = request.get_json()
+    return get_ChatBot_text(data)
+@chatbot_route.route("/api/v1/chatbot/deleteChatBotText", methods=['POST'])
+@validate_token_admin
+def deleteChatBotText():
+    data = request.get_json()
+    return delete_ChatBot_text(data)

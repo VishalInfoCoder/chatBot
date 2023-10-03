@@ -27,13 +27,14 @@ def validate_token_admin(func):
         
         try:
             payloads=jwt.decode(myPayload[1], secret, algorithms=["HS256"])
+            print(payloads)
             if(payloads['role']=="ADMIN"):
                 session['user_id'] = payloads['user_id']
                 return func(*args, **kwargs)
             else:
-                return make_response({"message": "Invalid User"}, 500) 
+                return make_response({"message": "Invalid User","status":False}) 
         except Exception as e: 
-            print(e)
-            return make_response({"message": "Invalid token provided"}, 403)   
+            # print(e)
+            return make_response({"message": "Invalid token provided","status":False})   
     wrapper.__name__ = func.__name__
     return wrapper

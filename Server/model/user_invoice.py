@@ -1,4 +1,4 @@
-from mongoengine import Document, StringField, EmailField,BooleanField,DateTimeField,FloatField,ObjectIdField
+from mongoengine import Document, StringField, EmailField,BooleanField,DateTimeField,FloatField,ObjectIdField,DictField,IntField
 from bson import ObjectId
 import datetime
 class User_invoices(Document):
@@ -12,8 +12,8 @@ class User_invoices(Document):
     sgst=FloatField(required=True, max_length=24)
     invoice_number=StringField(required=True, max_length=40)
     year=StringField(required=True, max_length=40)
-    inv_int=StringField(required=True, max_length=40)
+    inv_int=IntField(required=True, max_length=40)
     plan_id=ObjectIdField(required=True)
-    payment_details=StringField(max_length=50)
+    payment_details=DictField(max_length=50)
     created = DateTimeField(default=datetime.datetime.utcnow)
     updated = DateTimeField(default=datetime.datetime.utcnow)

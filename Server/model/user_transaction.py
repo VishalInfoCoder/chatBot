@@ -9,6 +9,5 @@ class User_transactions(Document):
     currency=StringField(required=True, max_length=40)
     plan_id=StringField(required=True, max_length=24)
     status=StringField(required=True, max_length=24)
-    payment_details=StringField(max_length=50)
     created = DateTimeField(default=datetime.datetime.utcnow)
     updated = DateTimeField(default=datetime.datetime.utcnow)
