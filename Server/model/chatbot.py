@@ -16,5 +16,7 @@ class chatBots(Document):
     validityEndDate=DateTimeField(null=True)
     purpose=StringField(max_length=40)
     questions=IntField(max_length=10,null=True)
+    key=StringField(max_length=40)
+    avatar_image=StringField()
     created = DateTimeField(default=datetime.datetime.utcnow)
     updated = DateTimeField(default=datetime.datetime.utcnow) 

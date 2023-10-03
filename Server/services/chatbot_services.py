@@ -1,9 +1,123 @@
 from model.chatbot import chatBots
-from flask import jsonify, make_response,session
+from model.userChatHistory import userChatHistory
+from flask import jsonify, make_response,session,request
 import os
+from werkzeug.utils import secure_filename
 import datetime
+import uuid
+import time
+import secrets
+import string
 from datetime import timedelta
 from bson import ObjectId
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from chromadb.utils import embedding_functions
+from config import client
+from langchain.vectorstores import Chroma
+
+from langchain.chains import RetrievalQA
+from langchain.chains import ConversationalRetrievalChain
+from langchain.memory import ConversationBufferMemory
+from langchain.prompts.prompt import PromptTemplate
+from langchain.chat_models import ChatOpenAI
+from langchain.chains import LLMChain
+from langchain.llms import AzureOpenAI
+import openai
+from langchain.embeddings.openai import OpenAIEmbeddings
+
+
+
+
+   
+openai_ef = embedding_functions.OpenAIEmbeddingFunction(
+                 api_key="5b60d2473952443cafceeee0b2797cf4",
+                 api_base="https://ai-ramsol-traning.openai.azure.com/",
+                 api_type="azure",
+                 api_version="2023-05-15",
+                 model_name="embedding-dev"
+            )
+
+def get_Answer(data):
+    try:
+        theBot=session['myBot']
+        print(theBot)
+        isUser = userChatHistory.objects[:1](email=data['email'],user_id=theBot['user_id']).first()
+        if not isUser:
+            isUser=userChatHistory(email=data['email'],history=[],user_id=theBot['user_id'])
+            isUser.save()   
+        question= data['question']
+        #embedding_function = OpenAIEmbeddings()
+        #embedding_function = OpenAIEmbeddings()
+        print(data['question'])
+        embedding_function = OpenAIEmbeddings(
+                    api_key="5b60d2473952443cafceeee0b2797cf4",
+                    openai_api_base="https://ai-ramsol-traning.openai.azure.com/",
+                    openai_api_type="azure",
+                    api_version="2023-05-15",
+                    deployment="embedding-dev",
+                    model="text-embedding-ada-002"
+                )
+        db4 = Chroma(client=client, collection_name=theBot['key'], embedding_function=embedding_function)
+        
+        
+        retriever = db4.as_retriever()
+        template = """Use the following pieces of context to answer the question at the end. 
+            If you don't know the answer, just say that you don't know, don't try to make up an answer. 
+            Use as much details as possible when responding. 
+            Context: {context}
+            Question: {question}
+            """
+    
+
+        QA_CHAIN_PROMPT = PromptTemplate.from_template(template)
+
+        
+        llm = ChatOpenAI(
+                deployment_id="Ai-training-example",   
+                model_name="gpt-35-turbo", 
+                temperature=0.5,
+            
+            )
+        
+        memory=ConversationBufferMemory(memory_key='chat_history', return_messages=True)
+
+        qa_chain = ConversationalRetrievalChain.from_llm(
+            llm,
+                retriever=retriever,
+            # chain_type_kwargs={"prompt": QA_CHAIN_PROMPT},
+                verbose=True,
+                combine_docs_chain_kwargs={"prompt": QA_CHAIN_PROMPT},
+                memory=memory
+            )
+       
+        result = qa_chain({"question": question})
+        saveData={}
+        saveData['_id'] = ObjectId()
+        saveData['question'] = question
+        saveData['answer'] = result['answer']
+        isUser.history.append(saveData)
+        isUser.save()
+        return make_response({'message':result['answer'] ,"status":True}) 
+    except Exception as e:
+        print(e)
+        return make_response({'message': str(e),"status":False})  
+def saveText(key,text):
+    #client = chromadb.HttpClient(host="localhost", port=8000)
+    collection = client.get_or_create_collection(name=key, embedding_function=openai_ef)
+    print(collection.count())
+
+    content =  text
+
+    text_splitter = RecursiveCharacterTextSplitter(
+         chunk_size=500, chunk_overlap=50)
+    docs = text_splitter.create_documents([content])
+
+    for doc in docs:
+        uuid_val = uuid.uuid1()
+        print("Inserted documents for ", uuid_val)
+        collection.add(ids=[str(uuid_val)], documents=doc.page_content)
+ 
+    return jsonify({'status': True})
 def add_ChatBot(botdata):
     try:
         is_bot=chatBots.objects[:1](name=botdata['name'],user_id=session['user_id'])
@@ -11,10 +125,15 @@ def add_ChatBot(botdata):
             return {"message": "chatBot Already Exist","status":False} 
         else:
             current_date = datetime.datetime.utcnow() 
+            characters = string.ascii_letters + string.digits
+            
             new_date = current_date + timedelta(days=15)
             chatbot=chatBots(user_id=session['user_id'],name=botdata['name'], validityStartDate = current_date,
             validityEndDate = new_date,questions=50,allowed_characters=1000,used_characters=0)
             chatbot.save()
+            random_key = ''.join(secrets.choice(characters) for _ in range(16))
+            final_key = str(chatbot.id) + random_key
+            chatbot.update(key=final_key)
             return {"message": "Success","data":str(chatbot.id),"status":True}
     except Exception as e:
         print(e)
@@ -38,6 +157,8 @@ def get_ChatBot(botdata):
                 bot_data['questions'] = bot.questions
                 bot_data['used_characters']=bot.used_characters
                 bot_data['allowed_characters']=bot.allowed_characters 
+                bot_data['key']=bot.key 
+                bot_data['avatar_image']=bot.avatar_image 
                 bot_data['created'] = bot.created.isoformat()
                
                 myResponse.append(bot_data)
@@ -113,15 +234,40 @@ def add_ChatBot_text(textData):
                 isBot.text.append(saveData)
                 isBot.used_characters=isBot.used_characters+len(textData['text'])
                 isBot.save()    
+                text_data_concatenated = '\n'.join(item['text_data'] for item in isBot.text)
+                saveText(isBot.key,text_data_concatenated)
                 return {"message": "ChatBot Text Added Successfully","status":True}
             else:
                 return {'message': "Limit Exceeded","status":False}
     except Exception as e:
         print(e)
-        return make_response({'message': str(e)}, 404)     
-def delete_ChatBot_text(textData):
+        return make_response({'message': str(e)}, 404)   
+def add_chatbot_avatar(textData):
     try:
-        saveData={}
+        if 'file' not in textData.files:
+            return jsonify({'message': 'No file part',"status":False})
+        isBot = chatBots.objects[:1](id=textData.form.get('id'),user_id=session['user_id']).first()
+        if not isBot:
+            return {"message": "chatBot does not exists","status":False}
+        file = textData.files['file']
+
+        if file.filename == '':
+            return jsonify({'message': 'No selected file',"status":False})
+        current_time = str(datetime.datetime.now().timestamp())
+        print(current_time)
+        filename = secure_filename(f"{session['user_id']}_{current_time}_{file.filename}")
+        print(filename)
+        if file:
+            filename = os.path.join("assets/images/", filename)
+            isBot.avatar_image=filename
+            file.save(filename)
+            isBot.save()
+            return jsonify({'message': 'File uploaded successfully',"status":True})
+    except Exception as e:
+        print(e)
+        return make_response({'message': str(e)}, 404)   
+def delete_ChatBot_text(textData): 
+    try:
         newdata=[]
         isBot = chatBots.objects[:1](id=textData['id'],user_id=session['user_id']).first()
         if not isBot:
@@ -137,3 +283,25 @@ def delete_ChatBot_text(textData):
     except Exception as e:
         print(e)
         return make_response({'message': str(e)}, 404)       
+def get_history(data):
+    try:
+      theBot=session['myBot']
+      print(theBot)
+      isUser = userChatHistory.objects[:1](email=data['email'],user_id=theBot['user_id']).first()
+      if not isUser:
+         return {"message": "NewUser","status":False}    
+      else:
+         botHistory = [{'_id': str(item['_id']), 'question': item['question'], 'answer': item['answer']} for item in isUser.history]
+         return make_response({"data": botHistory,"status":True}) 
+    except Exception as e:
+            print(e)
+            return make_response({'message': str(e)}, 404) 
+def get_chatBot_Bykey():
+    try:
+        print("in")
+        theBot=session['myBot']
+        
+        return make_response({"data": theBot,"status":True}) 
+    except Exception as e:
+            print(e)
+            return make_response({'message': str(e)}, 404) 

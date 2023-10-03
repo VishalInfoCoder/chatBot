@@ -2,7 +2,7 @@ from mongoengine import Document, StringField, EmailField,BooleanField,DateTimeF
 from bson import ObjectId
 import datetime
 class Users(Document):
-    name = StringField(required=True, max_length=256)
+    name = StringField(required=True, max_length=50)
     role = StringField(required=True, max_length=20)
     address = StringField(required=True, max_length=200)
     email = EmailField(required=True, max_length=1024)
