@@ -157,7 +157,8 @@ def get_ChatBot(botdata):
             bot_data['validityEndDate'] = isBot.validityEndDate
             bot_data['questions'] = isBot.questions
             bot_data['used_characters']=isBot.used_characters
-            bot_data['allowed_characters']=isBot.allowed_characters 
+            bot_data['allowed_characters']=isBot.allowed_characters
+            bot_data['purpose']=isBot.purpose 
             bot_data['key']=isBot.key 
             if isBot.avatar_image :
                 bot_data['avatar_image']=os.environ.get('url')+isBot.avatar_image 
@@ -290,7 +291,7 @@ def get_history(data):
       print(theBot)
       isUser = userChatHistory.objects[:1](email=data['email'],user_id=theBot['user_id']).first()
       if not isUser:
-         return {"message": "NewUser","status":False}    
+         return {"message": "NewUser","data":[],"status":True}    
       else:
          botHistory = [{'_id': str(item['_id']), 'question': item['question'], 'answer': item['answer']} for item in isUser.history]
          return make_response({"data": botHistory,"status":True}) 

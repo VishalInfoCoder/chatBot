@@ -14,7 +14,7 @@ class chatBots(Document):
     ))
     validityStartDate=DateTimeField(null=True)
     validityEndDate=DateTimeField(null=True)
-    purpose=StringField(max_length=40)
+    purpose=StringField(max_length=40,null=True)
     questions=IntField(max_length=10,null=True)
     key=StringField(max_length=40)
     avatar_image=StringField()

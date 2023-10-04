@@ -96,16 +96,7 @@ def view_all_plans():
         if not my_plans:
             return {"message": "Plans Not Found","status":False}
         else:
-            for plan in my_plans:
-                    plan_data = {}
-                    plan_data['_id'] = str(plan.id)
-                    plan_data['price'] = plan.price
-                    plan_data['validity'] = plan.validity
-                    plan_data['description'] = plan.description
-                    plan_data['title'] = plan.title
-                    plan_data['questions'] = plan.questions
-                    plan_data['created'] = plan.created
-                    myResponse.append(plan_data)      
+            myResponse.extend([{'_id': str(plan.id), 'price': plan.price, 'validity': plan.validity, 'description': plan.description, 'title': plan.title, 'questions': plan.questions, 'token_limit': plan.token_limit, 'created': plan.created} for plan in my_plans])      
             myResponse.insert(0, myResponse.pop())    
             return make_response({"data":myResponse,"status":True}, 200)        
     except Exception as e:
@@ -151,3 +142,12 @@ def updateChatBot(chatbot_id,plan):
     except Exception as e:
         print(e)
         return False
+def view_all_transactions(userdata):
+    try:
+        myResponse=[]
+        data=User_invoices.objects(user_id=session['user_id'])
+        myResponse.extend([{'_id':str(transaction_data.id),'user_id': str(transaction_data.user_id), 'total_amount': transaction_data.total_amount, 'basic_amount': transaction_data.basic_amount, 'tax_percentage': transaction_data.tax_percentage, 'total_tax_values': transaction_data.total_tax_values, 'cgst': transaction_data.cgst,'sgst': transaction_data.sgst, 'invoice_number': transaction_data.invoice_number,'payment_details': transaction_data.payment_details, 'created': transaction_data.created} for transaction_data in data])
+        return make_response({"data":myResponse,"status":True}, 200)
+    except Exception as e:
+        print(e)
+        return make_response({'message': str(e)}, 404) 
