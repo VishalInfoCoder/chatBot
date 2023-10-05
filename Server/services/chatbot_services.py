@@ -67,11 +67,12 @@ def get_Answer(data):
             
             retriever = db4.as_retriever()
             template = """Use the following pieces of context to answer the question at the end. 
-                If you don't know the answer, just say that you don't know, don't try to make up an answer. 
-                Use as much details as possible when responding. 
-                Context: {context}
-                Question: {question}
-                """
+                        If you don't know the answer, just say that you don't know, don't try to make up an answer. 
+                        Use as much details as possible when responding.
+                        Use bullet points if you have to make a list, only if necessary. 
+                        Context: {context}
+                        Question: {question}
+                        """
         
 
             QA_CHAIN_PROMPT = PromptTemplate.from_template(template)
@@ -104,9 +105,9 @@ def get_Answer(data):
             isUser.save()
             updateBot(theBot)
 
-            paragraphs = re.split(r'\.\s+', result['answer'])
+            # paragraphs = re.split(r'\.\s+', result['answer'])
 
-            return make_response({'message':paragraphs ,"status":True}) 
+            return make_response({'message':result['answer'] ,"status":True}) 
     except Exception as e: 
         print(e)
         return make_response({'message': str(e),"status":False}) 
@@ -197,6 +198,7 @@ def get_all_ChatBot():
                 bot_data['questions'] = bot.questions
                 bot_data['used_characters']=bot.used_characters
                 bot_data['allowed_characters']=bot.allowed_characters 
+                bot_data['plan_name']=bot.plan_name 
                 bot_data['created'] = bot.created.isoformat()
                 myResponse.append(bot_data)
             return make_response({"data":myResponse,"status":True}, 200)    
@@ -303,7 +305,7 @@ def get_history(data):
       if not isUser:
          return {"message": "NewUser","data":[],"status":True}    
       else:
-         botHistory = [{'_id': str(item['_id']), 'question': item['question'], 'answer': item['answer']} for item in isUser.history]
+         botHistory = [{'_id': str(item['_id']), 'question': item['question'], 'answer': item['answer'],'created':item['created']} for item in isUser.history]
          return make_response({"data": botHistory,"status":True}) 
     except Exception as e:
             print(e)
@@ -357,12 +359,19 @@ def get_chat_users(data):
     try:
         print(session['user_id'])
         print(data['id'])
-        isBot = userChatHistory.objects(user_id=session['user_id'],chatbot_id=data['id'])
+        if data['page']:
+            page=data['page']
+        else:
+            page=0  
+        per_page=10      
+        skip = (page - 1) * per_page
+        isBot = userChatHistory.objects(user_id=session['user_id'],chatbot_id=data['id']).skip(skip).limit(per_page)
+        count = userChatHistory.objects(user_id=session['user_id'],chatbot_id=data['id']).count()
         if not isBot:
             return {"message": "Chat does not exists","data":[],"status":False}
         else:
            user_data= [{'id': str(item['id']), 'email': item['email']} for item in isBot]
-           return make_response({"data": user_data,"status":True})
+           return make_response({"data": user_data,"count":count,"status":True})
     except Exception as e:
             print(e)
             return make_response({'message': str(e)}, 404)        
