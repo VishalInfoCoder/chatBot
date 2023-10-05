@@ -105,7 +105,7 @@ def get_Answer(data):
         paragraphs = re.split(r'\n\s*\n', result['answer'])
 
         return make_response({'message':paragraphs ,"status":True}) 
-    except Exception as e:
+    except Exception as e: 
         print(e)
         return make_response({'message': str(e),"status":False})  
 def saveText(key,text):
