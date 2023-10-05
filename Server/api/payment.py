@@ -1,5 +1,5 @@
 from flask import Blueprint, request
-from services.payment_service import initiate_transaction,view_all_plans,get_PaymentSuccess,view_all_transactions
+from services.payment_service import initiate_transaction,view_all_plans,get_PaymentSuccess,view_all_transactions,view_transaction
 payment_route = Blueprint('payment_route', __name__)
 from utils.JwtToken import validate_token_admin
 
@@ -22,3 +22,8 @@ def getPaymentSuccess():
 def viewAllTransactions():
     data = request.get_json()
     return view_all_transactions(data)
+@payment_route.route("/api/v1/payment/viewTransaction", methods=['POST'])
+@validate_token_admin
+def viewTransaction():
+    data = request.get_json()
+    return view_transaction(data)

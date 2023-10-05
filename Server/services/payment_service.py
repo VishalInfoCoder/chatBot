@@ -151,3 +151,12 @@ def view_all_transactions(userdata):
     except Exception as e:
         print(e)
         return make_response({'message': str(e)}, 404) 
+def view_transaction(userdata):
+    try:
+        myResponse={}
+        transaction_data=User_invoices.objects(user_id=session['user_id'],id=userdata['id']).first()
+        myResponse.extend({'_id':str(transaction_data.id),'user_id': str(transaction_data.user_id), 'total_amount': transaction_data.total_amount, 'basic_amount': transaction_data.basic_amount, 'tax_percentage': transaction_data.tax_percentage, 'total_tax_values': transaction_data.total_tax_values, 'cgst': transaction_data.cgst,'sgst': transaction_data.sgst, 'invoice_number': transaction_data.invoice_number,'payment_details': transaction_data.payment_details, 'created': transaction_data.created})
+        return make_response({"data":myResponse,"status":True}, 200)
+    except Exception as e:
+        print(e)
+        return make_response({'message': str(e)}, 404) 

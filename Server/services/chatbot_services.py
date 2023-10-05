@@ -132,7 +132,7 @@ def add_ChatBot(botdata):
             
             new_date = current_date + timedelta(days=15)
             chatbot=chatBots(user_id=session['user_id'],name=botdata['name'], validityStartDate = current_date,
-            validityEndDate = new_date,questions=50,allowed_characters=1000,used_characters=0,purpose=botdata['purpose'])
+            validityEndDate = new_date,questions=50,allowed_characters=1000,used_characters=0)
             chatbot.save()
             random_key = ''.join(secrets.choice(characters) for _ in range(16))
             final_key = str(chatbot.id) + random_key
