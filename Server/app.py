@@ -17,7 +17,7 @@ app.register_blueprint(chatbot_route)
 app.register_blueprint(static_bp)
 # app.register_blueprint(product_route)
 app.secret_key = secret
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 connect(host=os.environ.get('MONGO_URI'))
 
