@@ -1,5 +1,5 @@
 from flask import Blueprint, request,jsonify, make_response,session
-from services.chatbot_services import add_ChatBot,get_ChatBot,get_all_ChatBot,edit_ChatBot,add_ChatBot_text,get_ChatBot_text,delete_ChatBot_text,add_chatbot_avatar,get_Answer,get_history,get_chatBot_Bykey
+from services.chatbot_services import add_ChatBot,get_ChatBot,get_all_ChatBot,edit_ChatBot,add_ChatBot_text,get_ChatBot_text,delete_ChatBot_text,add_chatbot_avatar,get_Answer,get_history,get_chatBot_Bykey,update_company_details,get_chatBot_plan
 chatbot_route = Blueprint('chatbot_route', __name__)
 from utils.JwtToken import validate_token_admin,validate_apiKey
 
@@ -77,4 +77,22 @@ def addChatbotAvatar():
         return add_chatbot_avatar(request)
     except Exception as e:
         print(e)
+        return make_response({'message': str(e)}, 404) 
+@chatbot_route.route("/api/v1/chatbot/updateCompanyDetails", methods=['POST'])
+@validate_token_admin
+def updateCompanyDetails():
+    try:
+        data = request.get_json()
+        return update_company_details(data)
+    except Exception as e:
+        print(e)
         return make_response({'message': str(e)}, 404)    
+@chatbot_route.route("/api/v1/chatbot/getChatBotPlan", methods=['POST'])
+@validate_token_admin
+def getChatBotPlan():
+    try:
+        data = request.get_json()
+        return get_chatBot_plan(data)
+    except Exception as e:
+        print(e)
+        return make_response({'message': str(e)}, 404)  

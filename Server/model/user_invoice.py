@@ -4,6 +4,7 @@ import datetime
 class User_invoices(Document):
     user_id = ObjectIdField(required=True)
     transaction_id = ObjectIdField(required=True)
+    chatbot_id = ObjectIdField(required=True)
     total_amount=FloatField(required=True, max_length=24)
     basic_amount=FloatField(required=True, max_length=24)
     tax_percentage=FloatField(required=True, max_length=24)

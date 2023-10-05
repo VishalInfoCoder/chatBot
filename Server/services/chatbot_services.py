@@ -1,4 +1,5 @@
 from model.chatbot import chatBots
+from model.plan import Plans
 from model.userChatHistory import userChatHistory
 from flask import jsonify, make_response,session,request
 import os
@@ -123,16 +124,20 @@ def saveText(key,text):
     return jsonify({'status': True})
 def add_ChatBot(botdata):
     try:
+        free_plan=Plans.objects[:1](description="Free.").first()
         is_bot=chatBots.objects[:1](name=botdata['name'],user_id=session['user_id'])
+        is_free_bot=chatBots.objects[:1](plan_name="Free.",user_id=session['user_id'])
         if is_bot:
             return {"message": "chatBot Already Exist","status":False} 
+        elif is_free_bot:
+            return {"message": "Cant create Chatbot","status":False}
         else:
             current_date = datetime.datetime.utcnow() 
             characters = string.ascii_letters + string.digits
             
             new_date = current_date + timedelta(days=15)
             chatbot=chatBots(user_id=session['user_id'],name=botdata['name'], validityStartDate = current_date,
-            validityEndDate = new_date,questions=50,allowed_characters=1000,used_characters=0)
+            validityEndDate = new_date,questions=50,allowed_characters=1000,used_characters=0,plan_name=free_plan['description'],plan_id=free_plan['id'])
             chatbot.save()
             random_key = ''.join(secrets.choice(characters) for _ in range(16))
             final_key = str(chatbot.id) + random_key
@@ -159,6 +164,8 @@ def get_ChatBot(botdata):
             bot_data['used_characters']=isBot.used_characters
             bot_data['allowed_characters']=isBot.allowed_characters
             bot_data['purpose']=isBot.purpose 
+            bot_data['company_name']=isBot.company_name
+            bot_data['company_description']=isBot.company_description
             bot_data['key']=isBot.key 
             if isBot.avatar_image :
                 bot_data['avatar_image']=os.environ.get('url')+isBot.avatar_image 
@@ -315,4 +322,32 @@ def updateBot(data):
     else:
         isBot.questions=isBot.questions-1
         isBot.save()
+def update_company_details(data):
+    try:
+        isBot = chatBots.objects[:1](user_id=session['user_id'],id=data['id']).first()
+        if not isBot:
+            return {"message": "chatBot does not exists","status":False}
+        else:
+            isBot.company_name=data['company_name']
+            isBot.company_description=data['company_description']
+            isBot.save()
+            return {"message": "Company Data Saved","status":True} 
+    except Exception as e:
+            print(e)
+            return make_response({'message': str(e)}, 404)     
+def get_chatBot_plan(data):
+    try:
+        isBot = chatBots.objects[:1](user_id=session['user_id'],id=data['id']).first()
+        if not isBot:
+            return {"message": "chatBot does not exists","status":False}
+        else:
+            plan=Plans.objects[:1](id=isBot['plan_id']).first()
+            if plan:
+                plan_data={'_id': str(plan.id), 'price': plan.price, 'validity': plan.validity, 'description': plan.description, 'title': plan.title, 'questions': plan.questions, 'token_limit': plan.token_limit, 'created': plan.created}
+                return make_response({"data": plan_data,"status":True})
+            else:
+                return {"message": "No plan found! Please upgrade.","status":False}
+    except Exception as e:
+            print(e)
+            return make_response({'message': str(e)}, 404) 
             

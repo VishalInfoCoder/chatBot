@@ -51,7 +51,7 @@ def get_PaymentSuccess(success_data):
             intInc=int(invoice_data["inv_int"])+1 
             inv_int=set_invoiceNumber(intInc)
             newInv="INV-"+str(current_year)+str(inv_int)
-            create_user_invoice=User_invoices(user_id=transaction_data['user_id'],transaction_id=transaction_data['id'],total_amount=transaction_data['total_amount'],basic_amount=plan_data['price'],tax_percentage='5',total_tax_values=00000000.1,cgst=2.5,sgst=2.5,invoice_number=newInv,year=str(current_year),inv_int=intInc,plan_id=plan_data['id'],payment_details=payment)
+            create_user_invoice=User_invoices(chatbot_id=transaction_data['chatbot_id'],user_id=transaction_data['user_id'],transaction_id=transaction_data['id'],total_amount=transaction_data['total_amount'],basic_amount=plan_data['price'],tax_percentage='5',total_tax_values=00000000.1,cgst=2.5,sgst=2.5,invoice_number=newInv,year=str(current_year),inv_int=intInc,plan_id=plan_data['id'],payment_details=payment)
             create_user_invoice.save()
             transaction_data.update(status='paid')
             updateChatBot(transaction_data['chatbot_id'],plan_data)
@@ -59,7 +59,7 @@ def get_PaymentSuccess(success_data):
             intInc=1 
             inv_int=set_invoiceNumber(intInc)
             newInv="INV-"+str(current_year)+str(inv_int)
-            create_user_invoice=User_invoices(user_id=transaction_data['user_id'],transaction_id=transaction_data['id'],total_amount=transaction_data['total_amount'],basic_amount=plan_data['price'],tax_percentage='5',total_tax_values=00000000.1,cgst=2.5,sgst=2.5,invoice_number=newInv,year=str(current_year),inv_int=intInc,plan_id=plan_data['id'],payment_details=payment)
+            create_user_invoice=User_invoices(chatbot_id=transaction_data['chatbot_id'],user_id=transaction_data['user_id'],transaction_id=transaction_data['id'],total_amount=transaction_data['total_amount'],basic_amount=plan_data['price'],tax_percentage='5',total_tax_values=00000000.1,cgst=2.5,sgst=2.5,invoice_number=newInv,year=str(current_year),inv_int=intInc,plan_id=plan_data['id'],payment_details=payment)
             create_user_invoice.save()   
             transaction_data.update(status='paid')
             updateChatBot(transaction_data['chatbot_id'],plan_data)
@@ -126,17 +126,23 @@ def updateChatBot(chatbot_id,plan):
             bot_data.allowed_characters = int(plan['token_limit'])
             bot_data.validityStartDate = current_date
             bot_data.validityEndDate = new_date
+            bot_data.plan_id=plan['id']
+            bot_data.plan_name=plan['description']
             bot_data.save()
         elif  bot_data['validityEndDate'] < current_date:
             bot_data.questions = bot_data.questions+int(plan['questions'])
             bot_data.allowed_characters = int(plan['token_limit'])
             bot_data.validityStartDate = current_date
             bot_data.validityEndDate = new_date
+            bot_data.plan_id=plan['id']
+            bot_data.plan_name=plan['description']
             bot_data.save()
         else:
             bot_data.questions = bot_data.questions+int(plan['questions'])
             bot_data.validityEndDate =bot_data.validityEndDate + timedelta(days=30)
             bot_data.allowed_characters = int(plan['token_limit'])
+            bot_data.plan_id=plan['id']
+            bot_data.plan_name=plan['description']
             bot_data.save()
         return True
     except Exception as e:
@@ -151,9 +157,10 @@ def view_all_transactions(userdata):
             page=0  
         per_page=10      
         skip = (page - 1) * per_page
-        data=User_invoices.objects(user_id=session['user_id']).skip(skip).limit(per_page)
+        data=User_invoices.objects(user_id=session['user_id'],chatbot_id=userdata['chatbot_id']).skip(skip).limit(per_page)
+        total_count = User_invoices.objects(user_id=session['user_id'],chatbot_id=userdata['chatbot_id']).count()
         myResponse.extend([{'_id':str(transaction_data.id),'user_id': str(transaction_data.user_id), 'total_amount': transaction_data.total_amount, 'basic_amount': transaction_data.basic_amount, 'tax_percentage': transaction_data.tax_percentage, 'total_tax_values': transaction_data.total_tax_values, 'cgst': transaction_data.cgst,'sgst': transaction_data.sgst, 'invoice_number': transaction_data.invoice_number,'payment_details': transaction_data.payment_details, 'created': transaction_data.created} for transaction_data in data])
-        return make_response({"data":myResponse,"status":True}, 200)
+        return make_response({"data":myResponse,"count":total_count,"status":True}, 200)
     except Exception as e:
         print(e)
         return make_response({'message': str(e)}, 404) 
