@@ -46,11 +46,10 @@ def get_Answer(data):
         theBot=session['myBot']
         isUser = userChatHistory.objects[:1](email=data['email'],user_id=theBot['user_id']).first()
         if not isUser:
-            isUser=userChatHistory(email=data['email'],history=[],user_id=theBot['user_id'])
+            isUser=userChatHistory(email=data['email'],history=[],user_id=theBot['user_id'],chatbot_id=theBot['id'])
             isUser.save()   
-
         question= data['question']
-        if int(question) !=0:
+        if int(theBot['questions'])>0:
             #embedding_function = OpenAIEmbeddings()
             #embedding_function = OpenAIEmbeddings()
             print(data['question'])
@@ -100,11 +99,12 @@ def get_Answer(data):
             saveData['_id'] = ObjectId()
             saveData['question'] = question
             saveData['answer'] = result['answer']
+            saveData['created']=datetime.datetime.utcnow() 
             isUser.history.append(saveData)
             isUser.save()
             updateBot(theBot)
 
-            paragraphs = re.split(r'\n\s*\n', result['answer'])
+            paragraphs = re.split(r'\.\s+', result['answer'])
 
             return make_response({'message':paragraphs ,"status":True}) 
     except Exception as e: 
@@ -299,9 +299,7 @@ def delete_ChatBot_text(textData):
         return make_response({'message': str(e)}, 404)       
 def get_history(data):
     try:
-      theBot=session['myBot']
-      print(theBot)
-      isUser = userChatHistory.objects[:1](email=data['email'],user_id=theBot['user_id']).first()
+      isUser = userChatHistory.objects[:1](email=data['email'],user_id=session['user_id'],chatbot_id=data['chatbot_id']).first()
       if not isUser:
          return {"message": "NewUser","data":[],"status":True}    
       else:
@@ -355,4 +353,16 @@ def get_chatBot_plan(data):
     except Exception as e:
             print(e)
             return make_response({'message': str(e)}, 404) 
-            
+def get_chat_users(data):
+    try:
+        print(session['user_id'])
+        print(data['id'])
+        isBot = userChatHistory.objects(user_id=session['user_id'],chatbot_id=data['id'])
+        if not isBot:
+            return {"message": "Chat does not exists","data":[],"status":False}
+        else:
+           user_data= [{'id': str(item['id']), 'email': item['email']} for item in isBot]
+           return make_response({"data": user_data,"status":True})
+    except Exception as e:
+            print(e)
+            return make_response({'message': str(e)}, 404)        

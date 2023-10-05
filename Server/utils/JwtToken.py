@@ -35,7 +35,7 @@ def validate_token_admin(func):
             else:
                 return make_response({"message": "Invalid User","status":False}) 
         except Exception as e: 
-            # print(e)
+            print(e)
             return make_response({"message": "Invalid token provided","status":False})   
     wrapper.__name__ = func.__name__
     return wrapper
@@ -57,6 +57,7 @@ def validate_apiKey(func):
                 if(isBot.validityEndDate>current_time):
                     bot_data = {}
                     bot_data['name'] = isBot.name
+                    bot_data['id'] = str(isBot.id)
                     # bot_data['text'] = [{'_id': str(item['_id']), 'text_data': item['text_data'], 'title': item['title'], 'user_id': item['user_id']} for item in bot.text]
                     bot_data['validityStartDate'] = isBot.validityStartDate
                     bot_data['validityEndDate'] = isBot.validityEndDate
@@ -64,7 +65,7 @@ def validate_apiKey(func):
                     if isBot.avatar_image :
                         bot_data['avatar_image']=os.environ.get('url')+isBot.avatar_image  
                     bot_data['created'] = isBot.created.isoformat() 
-                    bot_data['user_id'] = str(isBot.user_id )
+                    bot_data['user_id'] = str(isBot.user_id)
                     bot_data['key'] = str(isBot.key)
                     session['myBot'] = bot_data
                     return func(*args, **kwargs)

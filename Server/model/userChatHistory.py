@@ -6,8 +6,10 @@ class userChatHistory(Document):
     history=ListField(DictField(
         _id=ObjectIdField(),
         question=StringField(),
-        answer=StringField()
+        answer=StringField(),
+        created = DateTimeField()
     ))
     user_id=ObjectIdField(required=True)
+    chatbot_id=ObjectIdField(required=True)
     created = DateTimeField(default=datetime.datetime.utcnow)
     updated = DateTimeField(default=datetime.datetime.utcnow)

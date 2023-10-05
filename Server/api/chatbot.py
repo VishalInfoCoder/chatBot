@@ -1,5 +1,5 @@
 from flask import Blueprint, request,jsonify, make_response,session
-from services.chatbot_services import add_ChatBot,get_ChatBot,get_all_ChatBot,edit_ChatBot,add_ChatBot_text,get_ChatBot_text,delete_ChatBot_text,add_chatbot_avatar,get_Answer,get_history,get_chatBot_Bykey,update_company_details,get_chatBot_plan
+from services.chatbot_services import add_ChatBot,get_ChatBot,get_all_ChatBot,edit_ChatBot,add_ChatBot_text,get_ChatBot_text,delete_ChatBot_text,add_chatbot_avatar,get_Answer,get_history,get_chatBot_Bykey,update_company_details,get_chatBot_plan,get_chat_users
 chatbot_route = Blueprint('chatbot_route', __name__)
 from utils.JwtToken import validate_token_admin,validate_apiKey
 
@@ -16,11 +16,7 @@ def getAnswer():
     data = request.get_json()
     return get_Answer(data)
 
-@chatbot_route.route('/api/v1/chatbot/getHistory', methods=['GET', 'POST'])
-@validate_apiKey
-def getHistory():
-    data = request.get_json()
-    return get_history(data)
+
 
 @chatbot_route.route('/api/v1/chatbot/getChatBotBykey', methods=['GET', 'POST'])
 @validate_apiKey
@@ -96,3 +92,19 @@ def getChatBotPlan():
     except Exception as e:
         print(e)
         return make_response({'message': str(e)}, 404)  
+
+@chatbot_route.route('/api/v1/chatbot/getHistory', methods=['GET', 'POST'])
+@validate_token_admin
+def getHistory():
+    data = request.get_json()
+    return get_history(data)    
+
+@chatbot_route.route('/api/v1/chatbot/getChatUsers', methods=['GET', 'POST'])
+@validate_token_admin
+def getChatUsers():
+    try:
+        data = request.get_json()
+        return get_chat_users(data)    
+    except Exception as e:
+            print(e)
+            return make_response({'message': str(e)}, 404)
