@@ -25,7 +25,7 @@ from langchain.chains import LLMChain
 from langchain.llms import AzureOpenAI
 import openai 
 from langchain.embeddings.openai import OpenAIEmbeddings
-
+import re
 
 os.environ["OPENAI_API_TYPE"] = "azure"
 os.environ["OPENAI_API_VERSION"] = "2023-05-15"
@@ -48,63 +48,68 @@ def get_Answer(data):
         if not isUser:
             isUser=userChatHistory(email=data['email'],history=[],user_id=theBot['user_id'])
             isUser.save()   
+
         question= data['question']
-        #embedding_function = OpenAIEmbeddings()
-        #embedding_function = OpenAIEmbeddings()
-        print(data['question'])
-        embedding_function = OpenAIEmbeddings(
-                    api_key="5b60d2473952443cafceeee0b2797cf4",
-                    openai_api_base="https://ai-ramsol-traning.openai.azure.com/",
-                    openai_api_type="azure",
-                    api_version="2023-05-15",
-                    deployment="embedding-dev",
-                    model="text-embedding-ada-002"
+        if int(question) !=0:
+            #embedding_function = OpenAIEmbeddings()
+            #embedding_function = OpenAIEmbeddings()
+            print(data['question'])
+            embedding_function = OpenAIEmbeddings(
+                        api_key="5b60d2473952443cafceeee0b2797cf4",
+                        openai_api_base="https://ai-ramsol-traning.openai.azure.com/",
+                        openai_api_type="azure",
+                        api_version="2023-05-15",
+                        deployment="embedding-dev",
+                        model="text-embedding-ada-002"
+                    )
+            print(theBot['key'])
+            db4 = Chroma(client=client, collection_name=theBot['key'], embedding_function=embedding_function)
+            
+            
+            retriever = db4.as_retriever()
+            template = """Use the following pieces of context to answer the question at the end. 
+                If you don't know the answer, just say that you don't know, don't try to make up an answer. 
+                Use as much details as possible when responding. 
+                Context: {context}
+                Question: {question}
+                """
+        
+
+            QA_CHAIN_PROMPT = PromptTemplate.from_template(template)
+
+            
+            llm = ChatOpenAI(
+                    deployment_id="Ai-training-example",   
+                    model_name="gpt-35-turbo", 
+                    temperature=0.5,
                 )
-        print(theBot['key'])
-        db4 = Chroma(client=client, collection_name=theBot['key'], embedding_function=embedding_function)
-        
-        
-        retriever = db4.as_retriever()
-        template = """Use the following pieces of context to answer the question at the end. 
-            If you don't know the answer, just say that you don't know, don't try to make up an answer. 
-            Use as much details as possible when responding. 
-            Context: {context}
-            Question: {question}
-            """
-    
+            
+            memory=ConversationBufferMemory(memory_key='chat_history', return_messages=True)
 
-        QA_CHAIN_PROMPT = PromptTemplate.from_template(template)
-
+            qa_chain = ConversationalRetrievalChain.from_llm(
+                llm,
+                    retriever=retriever,
+                # chain_type_kwargs={"prompt": QA_CHAIN_PROMPT},
+                    verbose=True,
+                    combine_docs_chain_kwargs={"prompt": QA_CHAIN_PROMPT},
+                    memory=memory
+                )
         
-        llm = ChatOpenAI(
-                deployment_id="Ai-training-example",   
-                model_name="gpt-35-turbo", 
-                temperature=0.5,
-            )
-        
-        memory=ConversationBufferMemory(memory_key='chat_history', return_messages=True)
+            result = qa_chain({"question": question})
+            saveData={}
+            saveData['_id'] = ObjectId()
+            saveData['question'] = question
+            saveData['answer'] = result['answer']
+            isUser.history.append(saveData)
+            isUser.save()
+            updateBot(theBot)
 
-        qa_chain = ConversationalRetrievalChain.from_llm(
-            llm,
-                retriever=retriever,
-            # chain_type_kwargs={"prompt": QA_CHAIN_PROMPT},
-                verbose=True,
-                combine_docs_chain_kwargs={"prompt": QA_CHAIN_PROMPT},
-                memory=memory
-            )
-       
-        result = qa_chain({"question": question})
-        saveData={}
-        saveData['_id'] = ObjectId()
-        saveData['question'] = question
-        saveData['answer'] = result['answer']
-        isUser.history.append(saveData)
-        isUser.save()
-        updateBot(theBot)
-        return make_response({'message':result['answer'] ,"status":True}) 
-    except Exception as e:
+            paragraphs = re.split(r'\n\s*\n', result['answer'])
+
+            return make_response({'message':paragraphs ,"status":True}) 
+    except Exception as e: 
         print(e)
-        return make_response({'message': str(e),"status":False})  
+        return make_response({'message': str(e),"status":False}) 
 def saveText(key,text):
     #client = chromadb.HttpClient(host="localhost", port=8000)
     collection = client.get_or_create_collection(name=key, embedding_function=openai_ef)
