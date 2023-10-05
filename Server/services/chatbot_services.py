@@ -100,7 +100,7 @@ def get_Answer(data):
         saveData['answer'] = result['answer']
         isUser.history.append(saveData)
         isUser.save()
-        updateBot(theBot)
+        updateBot(theBot) 
 
         paragraphs = re.split(r'\n\s*\n', result['answer'])
 
