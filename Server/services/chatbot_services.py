@@ -24,6 +24,7 @@ from langchain.chains import LLMChain
 from langchain.llms import AzureOpenAI
 import openai 
 from langchain.embeddings.openai import OpenAIEmbeddings
+import re
 
 
 os.environ["OPENAI_API_TYPE"] = "azure"
@@ -31,7 +32,7 @@ os.environ["OPENAI_API_VERSION"] = "2023-05-15"
 os.environ["OPENAI_API_BASE"] = "https://ai-ramsol-traning.openai.azure.com/"
 os.environ["OPENAI_API_KEY"] = "5b60d2473952443cafceeee0b2797cf4"
 os.environ["HUGGINGFACEHUB_API_TOKEN"] = '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'
-
+  
    
 openai_ef = embedding_functions.OpenAIEmbeddingFunction(
                  api_key="5b60d2473952443cafceeee0b2797cf4",
@@ -100,7 +101,10 @@ def get_Answer(data):
         isUser.history.append(saveData)
         isUser.save()
         updateBot(theBot)
-        return make_response({'message':result['answer'] ,"status":True}) 
+
+        paragraphs = re.split(r'\n\s*\n', result['answer'])
+
+        return make_response({'message':paragraphs ,"status":True}) 
     except Exception as e:
         print(e)
         return make_response({'message': str(e),"status":False})  
