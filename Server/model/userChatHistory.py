@@ -2,7 +2,7 @@ from mongoengine import Document, StringField, EmailField,BooleanField,DateTimeF
 from bson import ObjectId
 import datetime
 class userChatHistory(Document):
-    email=EmailField(required=True, max_length=24)
+    email=EmailField(required=True, max_length=250)
     history=ListField(DictField(
         _id=ObjectIdField(),
         question=StringField(),

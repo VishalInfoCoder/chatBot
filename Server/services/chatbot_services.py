@@ -210,6 +210,7 @@ def get_ChatBot(botdata):
             bot_data['support_name']=isBot.support_name
             bot_data['support_email']=isBot.support_email
             bot_data['support_mobile']=isBot.support_mobile
+            bot_data['theme']=isBot.theme
             bot_data['key']=isBot.key 
             if isBot.avatar_image :
                 bot_data['avatar_image']=os.environ.get('url')+isBot.avatar_image 
@@ -334,8 +335,11 @@ def delete_ChatBot_text(textData):
             isBot.used_characters=newCount
             isBot.save()
             textdata='\n'.join(item['text_data'] for item in isBot.text)
-            resaveText(isBot.key,textdata)
-            return {"message": "ChatBot Text Removed Successfully","status":True}
+            if (len(textData)==0):
+                 return {"message": "ChatBot Text Removed Successfully","status":True}
+            else:
+                resaveText(isBot.key,textdata)
+                return {"message": "ChatBot Text Removed Successfully","status":True}
     except Exception as e:
         print(e)
         return make_response({'message': str(e)}, 404)       
@@ -423,7 +427,7 @@ def set_chat_bot_theme(data):
         else:
             isBot.theme=data['theme']
             isBot.save()
-            return {"message": "Company Data Saved","status":True} 
+            return {"message": "Theme Changed","status":True} 
     except Exception as e:
             print(e)
             return make_response({'message': str(e)}, 404)   

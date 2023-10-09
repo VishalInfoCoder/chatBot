@@ -67,6 +67,13 @@ def validate_apiKey(func):
                     bot_data['created'] = isBot.created.isoformat() 
                     bot_data['user_id'] = str(isBot.user_id)
                     bot_data['key'] = str(isBot.key)
+                    bot_data['theme']=isBot.theme
+                    bot_data['purpose']=isBot.purpose 
+                    bot_data['company_name']=isBot.company_name
+                    bot_data['company_description']=isBot.company_description
+                    bot_data['support_name']=isBot.support_name
+                    bot_data['support_email']=isBot.support_email
+                    bot_data['support_mobile']=isBot.support_mobile
                     session['myBot'] = bot_data
                     return func(*args, **kwargs)
                 else:
