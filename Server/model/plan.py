@@ -5,6 +5,7 @@ class Plans(Document):
     price=FloatField(required=True, max_length=24)
     validity=StringField(required=True, max_length=40)
     description=StringField(required=True, max_length=40)
+    about=StringField()
     title=StringField(required=True, max_length=24)
     questions=StringField(required=True, max_length=24)
     token_limit=StringField(required=True, max_length=24)

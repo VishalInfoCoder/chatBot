@@ -64,7 +64,7 @@ def get_Answer(data):
             print(theBot['key'])
             db4 = Chroma(client=client, collection_name=theBot['key'], embedding_function=embedding_function)
             
-            
+            token="500"
             retriever = db4.as_retriever()
             template = """Use the following pieces of context to answer the question at the end. 
                         If you don't know the answer, just say that you don't know, don't try to make up an answer. 
@@ -87,7 +87,7 @@ def get_Answer(data):
             memory=ConversationBufferMemory(memory_key='chat_history', return_messages=True)
 
             qa_chain = ConversationalRetrievalChain.from_llm(
-                llm,
+                    llm,
                     retriever=retriever,
                 # chain_type_kwargs={"prompt": QA_CHAIN_PROMPT},
                     verbose=True,
@@ -106,8 +106,10 @@ def get_Answer(data):
             updateBot(theBot)
 
             # paragraphs = re.split(r'\.\s+', result['answer'])
-
+            print(result['answer'])
             return make_response({'message':result['answer'] ,"status":True}) 
+        else:
+            return {'message': "No questions left to ask","status":False}
     except Exception as e: 
         print(e)
         return make_response({'message': str(e),"status":False}) 
@@ -128,6 +130,39 @@ def saveText(key,text):
         collection.add(ids=[str(uuid_val)], documents=doc.page_content)
  
     return jsonify({'status': True})
+
+def resaveText(key,text):
+    client.delete_collection(name=key)
+
+    collection = client.get_or_create_collection(name=key, embedding_function=openai_ef)
+    print(collection.count())
+
+    content =  text
+
+    text_splitter = RecursiveCharacterTextSplitter(
+         chunk_size=500, chunk_overlap=50)
+    docs = text_splitter.create_documents([content])
+
+    for doc in docs:
+        uuid_val = uuid.uuid1()
+        print("Inserted documents for ", uuid_val)
+        collection.add(ids=[str(uuid_val)], documents=doc.page_content)
+ 
+    return jsonify({'status': True})
+def add_chatbot_support(data):
+    try:
+       is_bot=chatBots.objects[:1](id=data['id'],user_id=session['user_id']).first()
+       if not is_bot:
+            return {"message": "ChatBot Not Found","status":False} 
+       else:
+           is_bot.support_name=data['support_name']
+           is_bot.support_email=data['support_email']
+           is_bot.support_mobile=data['support_mobile']
+           is_bot.save()
+           return {"message": "Support Information Updated!","status":True}
+    except Exception as e:
+        print(e)
+        return make_response({'message': str(e),"status":False})    
 def add_ChatBot(botdata):
     try:
         free_plan=Plans.objects[:1](description="Free.").first()
@@ -142,8 +177,8 @@ def add_ChatBot(botdata):
             characters = string.ascii_letters + string.digits
             
             new_date = current_date + timedelta(days=15)
-            chatbot=chatBots(user_id=session['user_id'],name=botdata['name'], validityStartDate = current_date,
-            validityEndDate = new_date,questions=50,allowed_characters=1000,used_characters=0,plan_name=free_plan['description'],plan_id=free_plan['id'])
+            chatbot=chatBots(user_id=session['user_id'],name=botdata['name'],theme="Primary",validityStartDate = current_date,
+            validityEndDate = new_date,questions=int(free_plan['questions']),allowed_characters=int(free_plan['token_limit']),used_characters=0,plan_name=free_plan['description'],plan_id=free_plan['id'])
             chatbot.save()
             random_key = ''.join(secrets.choice(characters) for _ in range(16))
             final_key = str(chatbot.id) + random_key
@@ -172,6 +207,9 @@ def get_ChatBot(botdata):
             bot_data['purpose']=isBot.purpose 
             bot_data['company_name']=isBot.company_name
             bot_data['company_description']=isBot.company_description
+            bot_data['support_name']=isBot.support_name
+            bot_data['support_email']=isBot.support_email
+            bot_data['support_mobile']=isBot.support_mobile
             bot_data['key']=isBot.key 
             if isBot.avatar_image :
                 bot_data['avatar_image']=os.environ.get('url')+isBot.avatar_image 
@@ -248,7 +286,7 @@ def add_ChatBot_text(textData):
                     isBot.text.append(saveData)
                     isBot.used_characters=isBot.used_characters+len(textData['text'])
                     isBot.save()    
-                    text_data_concatenated = '\n'.join(item['text_data'] for item in isBot.text)
+                    text_data_concatenated = textData['text']
                     saveText(isBot.key,text_data_concatenated)
                     return {"message": "ChatBot Text Added Successfully","status":True}
                 else:
@@ -295,6 +333,8 @@ def delete_ChatBot_text(textData):
             newCount = sum(len(item['text_data']) for item in newdata)
             isBot.used_characters=newCount
             isBot.save()
+            textdata='\n'.join(item['text_data'] for item in isBot.text)
+            resaveText(isBot.key,textdata)
             return {"message": "ChatBot Text Removed Successfully","status":True}
     except Exception as e:
         print(e)
@@ -375,3 +415,15 @@ def get_chat_users(data):
     except Exception as e:
             print(e)
             return make_response({'message': str(e)}, 404)        
+def set_chat_bot_theme(data):
+    try:
+        isBot = chatBots.objects[:1](user_id=session['user_id'],id=data['id']).first()
+        if not isBot:
+            return {"message": "chatBot does not exists","status":False}
+        else:
+            isBot.theme=data['theme']
+            isBot.save()
+            return {"message": "Company Data Saved","status":True} 
+    except Exception as e:
+            print(e)
+            return make_response({'message': str(e)}, 404)   

@@ -96,7 +96,7 @@ def view_all_plans():
         if not my_plans:
             return {"message": "Plans Not Found","status":False}
         else:
-            myResponse.extend([{'_id': str(plan.id), 'price': plan.price, 'validity': plan.validity, 'description': plan.description, 'title': plan.title, 'questions': plan.questions, 'token_limit': plan.token_limit, 'created': plan.created} for plan in my_plans])      
+            myResponse.extend([{'_id': str(plan.id), 'price': plan.price, 'about': plan.about,'validity': plan.validity, 'description': plan.description, 'title': plan.title, 'questions': plan.questions, 'token_limit': plan.token_limit, 'created': plan.created} for plan in my_plans])      
             myResponse.insert(0, myResponse.pop())    
             return make_response({"data":myResponse,"status":True}, 200)        
     except Exception as e:
