@@ -1,6 +1,7 @@
 from model.chatbot import chatBots
 from model.plan import Plans
 from model.userChatHistory import userChatHistory
+from model.user import Users
 from flask import jsonify, make_response,session,request
 import os
 from werkzeug.utils import secure_filename
@@ -15,7 +16,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from chromadb.utils import embedding_functions
 from config import client
 from langchain.vectorstores import Chroma
-
+import time
 from langchain.chains import RetrievalQA
 from langchain.chains import ConversationalRetrievalChain
 from langchain.memory import ConversationBufferMemory
@@ -26,6 +27,7 @@ from langchain.llms import AzureOpenAI
 import openai 
 from langchain.embeddings.openai import OpenAIEmbeddings
 import re
+from utils.sendMail import send_verification_quota
 
 os.environ["OPENAI_API_TYPE"] = "azure"
 os.environ["OPENAI_API_VERSION"] = "2023-05-15"
@@ -40,16 +42,50 @@ openai_ef = embedding_functions.OpenAIEmbeddingFunction(
                  api_type="azure",
                  api_version="2023-05-15",
                  model_name="embedding-dev")
-
+def checkReminder(bot):
+    try:
+        print("here")
+        if int(bot['questions'])==50:
+            # Get the current date and time
+            now = datetime.datetime.now()
+            # Format the date as "Oct-10-YYYY"
+            formatted_date = now.strftime("%b-%d-%Y")
+            myuser=Users.objects[:1](id=bot['user_id']).first()
+            content = "You have 49 messages left as of "+formatted_date
+            html = f"<h3>{content}</h3>"
+            subject = "Quota Remainder!!"
+            to_address = "vishallegend7775@gmail.com"
+            receiver_username = myuser.name
+            # Send the email and store the response
+            email_response = send_verification_quota(subject, html, to_address, receiver_username)
+        elif int(bot['questions'])==20:
+            # Get the current date and time
+            now = datetime.datetime.now()
+            # Format the date as "Oct-10-YYYY"
+            formatted_date = now.strftime("%b-%d-%Y")
+            myuser=Users.objects[:1](id=bot['user_id']).first()
+            content = "You have 19 messages left as of "+formatted_date
+            html = f"<h3>{content}</h3>"
+            subject = "Quota Remainder!!"
+            to_address = "vishallegend7775@gmail.com"
+            receiver_username = myuser.name
+            # Send the email and store the response
+            email_response = send_verification_quota(subject, html, to_address, receiver_username)
+        else:
+            return False    
+    except Exception as e: 
+        print(e)
+        return make_response({'message': str(e),"status":False})     
 def get_Answer(data):
     try:
         theBot=session['myBot']
         isUser = userChatHistory.objects[:1](email=data['email'],user_id=theBot['user_id']).first()
         if not isUser:
-            isUser=userChatHistory(email=data['email'],history=[],user_id=theBot['user_id'],chatbot_id=theBot['id'])
+            isUser=userChatHistory(email=data['email'],history=[],user_id=theBot['user_id'],chatbot_id=theBot['id'], category = 'website')
             isUser.save()   
         question= data['question']
         if int(theBot['questions'])>0:
+            checkReminder(theBot)
             #embedding_function = OpenAIEmbeddings()
             #embedding_function = OpenAIEmbeddings()
             print(data['question'])
@@ -59,8 +95,7 @@ def get_Answer(data):
                         openai_api_type="azure",
                         api_version="2023-05-15",
                         deployment="embedding-dev",
-                        model="text-embedding-ada-002"
-                    )
+                        model="text-embedding-ada-002")
             print(theBot['key'])
             db4 = Chroma(client=client, collection_name=theBot['key'], embedding_function=embedding_function)
             
@@ -128,6 +163,7 @@ def saveText(key,text):
         uuid_val = uuid.uuid1()
         print("Inserted documents for ", uuid_val)
         collection.add(ids=[str(uuid_val)], documents=doc.page_content)
+        time.sleep(1)
  
     return jsonify({'status': True})
 
@@ -165,9 +201,9 @@ def add_chatbot_support(data):
         return make_response({'message': str(e),"status":False})    
 def add_ChatBot(botdata):
     try:
-        free_plan=Plans.objects[:1](description="Free.").first()
+        free_plan=Plans.objects[:1](description="Free").first()
         is_bot=chatBots.objects[:1](name=botdata['name'],user_id=session['user_id'])
-        is_free_bot=chatBots.objects[:1](plan_name="Free.",user_id=session['user_id'])
+        is_free_bot=chatBots.objects[:1](plan_name="Free",user_id=session['user_id'])
         if is_bot:
             return {"message": "chatBot Already Exist","status":False} 
         elif is_free_bot:
@@ -428,6 +464,44 @@ def set_chat_bot_theme(data):
             isBot.theme=data['theme']
             isBot.save()
             return {"message": "Theme Changed","status":True} 
+    except Exception as e:
+            print(e)
+            return make_response({'message': str(e)}, 404)   
+def setup_facebook_data(data):
+    try:
+        isBot = chatBots.objects[:1](user_id=session['user_id'],id=data['id']).first()
+        if not isBot:
+            return {"message": "chatBot does not exists","status":False}
+        else:
+            facebookData={}
+            facebookData['fbAppId']=data['fbAppId']
+            facebookData['fbAppSecret']=data['fbAppSecret']
+            facebookData['fbPageName']=data['fbPageName']
+            facebookData['fbPageId']=data['fbPageId']
+            facebookData['fbPageAccessToken']=data['fbPageAccessToken']
+            isBot.facebookData=facebookData
+            isBot.save()
+            return {"message": "Successfully Added","status":True} 
+    except Exception as e:
+            print(e)
+            return make_response({'message': str(e)}, 404)   
+def get_facebook_data(data):
+    try:
+        isBot = chatBots.objects[:1](user_id=session['user_id'],id=data['id']).first()
+        if not isBot:
+            return {"message": "chatBot does not exists","status":False}
+        else:
+            if isBot.facebookData:
+                facebookData={}
+                
+                facebookData['fbAppId']=isBot.facebookData['fbAppId']
+                facebookData['fbAppSecret']=isBot.facebookData['fbAppSecret']
+                facebookData['fbPageName']=isBot.facebookData['fbPageName']
+                facebookData['fbPageId']=isBot.facebookData['fbPageId']
+                facebookData['fbPageAccessToken']=isBot.facebookData['fbPageAccessToken']
+                return make_response({"data":facebookData,"status":True}, 200)
+            else:
+                return {"message": "Facebook not set up for this chatbot","status":False}
     except Exception as e:
             print(e)
             return make_response({'message': str(e)}, 404)   

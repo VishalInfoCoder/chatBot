@@ -1,10 +1,29 @@
 from model.user import Users
 from utils.passwordEncryption import encrypt_password, compare_passwords
+from utils.sendMail import send_verification_email
 from utils.JwtToken import generate_token
 from flask import jsonify, make_response
 import os
 import datetime
 
+
+
+def verify_email(data):
+    try:
+        get_user=Users.objects[:1](verify_id=data['verify_id']).first() 
+        if get_user:
+           if (get_user.is_email_verified== False):
+                   get_user.is_email_verified=True
+                   get_user.save()
+                   return {"message": "Email Verified Successfully","status":True}
+           else:
+               return {"message": "Email Already Verified Please Login","status":True}
+        else:
+            return {"message": "User not found!","status":True}   
+    except Exception as e:
+        return make_response({'message': str(e)}, 404)        
+
+       
 def signup_service(userdata):
     try:
         email_check = Users.objects[:1](email=userdata['email'])
@@ -18,12 +37,19 @@ def signup_service(userdata):
             address = userdata['address']
             role="ADMIN"
             password = encrypt_password(userdata['password'])
-
+            
             user = Users(name=name, email=email,
                         mobile=mobile, password=password,is_Active=1,role=role,is_email_verified=0,address=address)
             user.save()
-
-            return make_response({'message': 'Succesfully inserted',"status":True}, 200)
+            content = "Please click the link below to verify Your Email:"
+            link=os.environ.get('fronEndUrl')+"?token="+user.verify_id
+            html = f"<h3>{content}</h3> <br>{link}"
+            subject = "Registration Successfull!"
+            to_address = "vishallegend7775@gmail.com"
+            receiver_username = name
+            # Send the email and store the response
+            send_verification_email(subject, html, to_address, receiver_username)
+            return make_response({'message': 'Succesfully Created Please Verify The Email Sent To You!',"status":True}, 200)
 
     except Exception as e:
         return make_response({'message': str(e)}, 404)
@@ -37,13 +63,16 @@ def login_service(user_credentials):
         else:
             for user in email_check:
                 if(user['is_Active']==True):
-                    payload = {"email": user['email'], "user_id": str(user['id']),"role":user['role']}
-                    secret = os.environ.get('TOKEN_SECRET')
-                    if compare_passwords(user_credentials['password'], user['password']):
-                        token = generate_token(payload, secret)
-                        return make_response({'token': token,"status":True}, 200)
+                    if(user['is_email_verified']==True):
+                        payload = {"email": user['email'], "user_id": str(user['id']),"role":user['role']}
+                        secret = os.environ.get('TOKEN_SECRET')
+                        if compare_passwords(user_credentials['password'], user['password']):
+                            token = generate_token(payload, secret)
+                            return make_response({'token': token,"status":True}, 200)
+                        else:
+                            return make_response({'message': 'Invalid password',"status":False}, 403)
                     else:
-                        return make_response({'message': 'Invalid password',"status":False}, 403)
+                       return make_response({'message': 'Please Verify Your email before loging in !',"status":False}, 500)     
                 else:
                     return make_response({'message': 'User is Inactive Please Contact Administration!',"status":False}, 500)
     except Exception as e:

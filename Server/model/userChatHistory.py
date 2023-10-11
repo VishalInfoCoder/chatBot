@@ -3,6 +3,7 @@ from bson import ObjectId
 import datetime
 class userChatHistory(Document):
     email=EmailField(required=True, max_length=250)
+    category=StringField()
     history=ListField(DictField(
         _id=ObjectIdField(),
         question=StringField(),

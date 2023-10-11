@@ -13,3 +13,4 @@ class Users(Document):
     created = DateTimeField(default=datetime.datetime.utcnow)
     updated = DateTimeField(default=datetime.datetime.utcnow) 
     verify_id = StringField(required=True, max_length=24, unique=True, default=lambda: str(ObjectId()))  # Use ObjectId as default
+    

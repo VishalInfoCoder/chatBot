@@ -26,5 +26,12 @@ class chatBots(Document):
     support_mobile=StringField(max_length=40)
     plan_name=StringField(max_length=40)
     theme=StringField(max_length=40)
+    facebookData=DictField(
+        fbAppId=StringField(),
+        fbAppSecret=StringField(),
+        fbPageName=StringField(),
+        fbPageId=StringField(),
+        fbPageAccessToken=StringField(),
+    )
     created = DateTimeField(default=datetime.datetime.utcnow)
     updated = DateTimeField(default=datetime.datetime.utcnow) 
