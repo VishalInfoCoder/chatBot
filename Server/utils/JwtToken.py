@@ -62,6 +62,7 @@ def validate_apiKey(func):
                     bot_data['validityStartDate'] = isBot.validityStartDate
                     bot_data['validityEndDate'] = isBot.validityEndDate
                     bot_data['questions'] = isBot.questions
+                    bot_data['plan_id'] = str(isBot.plan_id)
                     if isBot.avatar_image :
                         bot_data['avatar_image']=os.environ.get('url')+isBot.avatar_image  
                     bot_data['created'] = isBot.created.isoformat() 

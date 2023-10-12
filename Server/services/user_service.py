@@ -2,7 +2,7 @@ from model.user import Users
 from utils.passwordEncryption import encrypt_password, compare_passwords
 from utils.sendMail import send_verification_email,send_reset_password_mail
 from utils.JwtToken import generate_token
-from flask import jsonify, make_response
+from flask import jsonify, make_response,Flask, render_template, request,session
 import os
 import datetime
 
@@ -37,13 +37,19 @@ def signup_service(userdata):
             address = userdata['address']
             role="ADMIN"
             password = encrypt_password(userdata['password'])
-            
             user = Users(name=name, email=email,
                         mobile=mobile, password=password,is_Active=1,role=role,is_email_verified=0,address=address)
             user.save()
-            content = "Please click the link below to verify Your Email:"
-            link=os.environ.get('fronEndUrl')+"?token="+user.verify_id
-            html = f"<h3>{content}</h3> <br>{link}"
+            # content = "Please click the link below to verify Your Email:"
+            mylink=os.environ.get('fronEndUrlMail')+"?token="+user.verify_id 
+            # html = f"<h3>{content}</h3> <br>{link}"
+            email_content = render_template(
+                'email_verification_template.html',
+                name=name,
+                sitename="Infoapto",
+                link=mylink
+            )
+            html=email_content
             subject = "Registration Successfull!"
             to_address = "vishallegend7775@gmail.com"
             receiver_username = name
@@ -59,12 +65,18 @@ def forget_password(data):
         if not email_check:
             return {"message": "Email does not exists","status":False}
         else:
-            content = "Please click the link below to change your password:"
-            link=os.environ.get('fronEndUrlPassword')+"?token="+email_check.verify_id
-            html = f"<h3>{content}</h3> <br>{link}"
+            myuser=email_check[0]
+            link=os.environ.get('fronEndUrlPassword')+"?token="+myuser.verify_id
+            email_content = render_template(
+                'password_reset_template.html',
+                name=myuser.name,
+                sitename="Infoapto",
+                link=link
+            )
+            html=email_content
             subject = "Your link to reset password!"
             to_address = "vishallegend7775@gmail.com"
-            receiver_username = email_check.name
+            receiver_username = myuser.name
             # Send the email and store the response
             send_reset_password_mail(subject, html, to_address, receiver_username)
             return make_response({'message': 'An email link has been sent to your registered mail follow the link for further process! ',"status":True}, 200)
@@ -78,25 +90,24 @@ def reset_password(data):
             return {"message": "Invalid Action","status":False}
          else:
             password = encrypt_password(data['password'])
-            email_check.password=password
-            email_check.save()
+            email_check.update(password=password.decode('utf-8'))
             return make_response({'message': 'Password reset successfully!',"status":True}, 200)
     except Exception as e:
         return make_response({'message': str(e)}, 404)
 def change_password(data):
     try:
-         email_check = Users.objects[:1](email=data['email'])
-         if not email_check:
+         email_check = Users.objects[:1](id=session['user_id']).first()
+         if not email_check: 
             return {"message": "Invalid Action","status":False}
          else:
-            if compare_passwords(email_check['password'], data['oldPassword']):
-                password = encrypt_password(data['newPassword'])
-                email_check.password=password
-                email_check.save()
+            if compare_passwords(data['oldPassword'],email_check['password']):
+                password=encrypt_password(data['newPassword'])
+                email_check.update(password=password.decode('utf-8'))
                 return make_response({'message': 'Password reset successfully!',"status":True}, 200)
             else:
                 return make_response({'message': 'Oldpassword Mismatch!',"status":True}, 200)
     except Exception as e:
+        print(e)
         return make_response({'message': str(e)}, 404)
 def login_service(user_credentials):
     try:
@@ -115,9 +126,9 @@ def login_service(user_credentials):
                         else:
                             return make_response({'message': 'Invalid password',"status":False}, 403)
                     else:
-                       return make_response({'message': 'Please Verify Your email before loging in !',"status":False}, 500)     
+                       return make_response({'message': 'Please Verify Your email before loging in !',"status":False})     
                 else:
-                    return make_response({'message': 'User is Inactive Please Contact Administration!',"status":False}, 500)
+                    return make_response({'message': 'User is Inactive Please Contact Administration!',"status":False})
     except Exception as e:
         return make_response({'message': str(e)}, 404)            
 def edit_user(editdata): 

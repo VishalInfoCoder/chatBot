@@ -2,7 +2,7 @@ from model.chatbot import chatBots
 from model.plan import Plans
 from model.userChatHistory import userChatHistory
 from model.user import Users
-from flask import jsonify, make_response,session,request
+from flask import jsonify, make_response,session,Flask, render_template, request
 import os
 from werkzeug.utils import secure_filename
 import datetime
@@ -51,8 +51,20 @@ def checkReminder(bot):
             # Format the date as "Oct-10-YYYY"
             formatted_date = now.strftime("%b-%d-%Y")
             myuser=Users.objects[:1](id=bot['user_id']).first()
-            content = "You have 49 messages left as of "+formatted_date
-            html = f"<h3>{content}</h3>"
+            plan=Plans.objects[:1](id=bot['plan_id']).first()
+            usedamount=(int(plan.questions)-49)
+            totalamount=int(plan.questions)
+            remainingamount=int(plan.questions)-usedamount
+            email_content = render_template(
+                'quota_reminder_template.html',
+                name=myuser.name,
+                sitename="Infoapto",
+                usedamount=usedamount,
+                totalamount=totalamount,
+                remainingamount=remainingamount,
+                date=formatted_date
+            )
+            html =email_content
             subject = "Quota Remainder!!"
             to_address = "vishallegend7775@gmail.com"
             receiver_username = myuser.name
@@ -64,8 +76,20 @@ def checkReminder(bot):
             # Format the date as "Oct-10-YYYY"
             formatted_date = now.strftime("%b-%d-%Y")
             myuser=Users.objects[:1](id=bot['user_id']).first()
-            content = "You have 19 messages left as of "+formatted_date
-            html = f"<h3>{content}</h3>"
+            plan=Plans.objects[:1](id=bot['plan_id']).first()
+            usedamount=(int(plan.questions)-19)
+            totalamount=int(plan.questions)
+            remainingamount=int(plan.questions)-usedamount
+            email_content = render_template(
+                'quota_reminder_template.html',
+                name=myuser.name,
+                sitename="Infoapto",
+                usedamount=usedamount,
+                totalamount=totalamount,
+                remainingamount=remainingamount,
+                date=formatted_date
+            )
+            html = email_content
             subject = "Quota Remainder!!"
             to_address = "vishallegend7775@gmail.com"
             receiver_username = myuser.name
