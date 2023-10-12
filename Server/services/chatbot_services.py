@@ -437,16 +437,14 @@ def get_chatBot_plan(data):
             return make_response({'message': str(e)}, 404) 
 def get_chat_users(data):
     try:
-        print(session['user_id'])
-        print(data['id'])
         if data['page']:
             page=data['page']
         else:
             page=0  
         per_page=10      
         skip = (page - 1) * per_page
-        isBot = userChatHistory.objects(user_id=session['user_id'],chatbot_id=data['id']).skip(skip).limit(per_page)
-        count = userChatHistory.objects(user_id=session['user_id'],chatbot_id=data['id']).count()
+        isBot = userChatHistory.objects(user_id=session['user_id'],chatbot_id=data['id'],category=data['category']).skip(skip).limit(per_page)
+        count = userChatHistory.objects(user_id=session['user_id'],chatbot_id=data['id'],category=data['category']).count()
         if not isBot:
             return {"message": "Chat does not exists","data":[],"status":False}
         else:

@@ -1,6 +1,6 @@
 from model.user import Users
 from utils.passwordEncryption import encrypt_password, compare_passwords
-from utils.sendMail import send_verification_email
+from utils.sendMail import send_verification_email,send_reset_password_mail
 from utils.JwtToken import generate_token
 from flask import jsonify, make_response
 import os
@@ -53,8 +53,24 @@ def signup_service(userdata):
 
     except Exception as e:
         return make_response({'message': str(e)}, 404)
+def forget_password(data):
+    try:
+        email_check = Users.objects[:1](email=data['email'])
+        if not email_check:
+            return {"message": "Email does not exists","status":False}
+        else:
+            content = "Please click the link below to verify Your Email:"
+            link=os.environ.get('fronEndUrl')+"?token="+email_check.verify_id
+            html = f"<h3>{content}</h3> <br>{link}"
+            subject = "Your link to reset password!"
+            to_address = "vishallegend7775@gmail.com"
+            receiver_username = email_check.name
+            # Send the email and store the response
+            send_reset_password_mail(subject, html, to_address, receiver_username)
+            return make_response({'message': 'Succesfully Created Please Verify The Email Sent To You!',"status":True}, 200)
 
-
+    except Exception as e:
+        return make_response({'message': str(e)}, 404)
 def login_service(user_credentials):
     try:
         email_check = Users.objects[:1](email=user_credentials['email'])
