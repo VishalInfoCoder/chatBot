@@ -1,5 +1,5 @@
 from flask import Blueprint, request
-from services.user_service import signup_service,login_service,edit_user,get_user,get_all_user,update_userStatus,verify_email
+from services.user_service import signup_service,login_service,edit_user,get_user,get_all_user,update_userStatus,verify_email,forget_password,reset_password,change_password
 user_route = Blueprint('user_route', __name__)
 from utils.JwtToken import validate_token_admin
 
@@ -18,7 +18,22 @@ def verifyEmail():
     data = request.get_json()
     return verify_email(data)
 
+@user_route.route("/api/v1/user/forgetPassword", methods=['POST'])
+def forgetPassword():
+    data = request.get_json()
+    return forget_password(data)
 
+@user_route.route("/api/v1/user/resetPassword", methods=['POST'])
+def resetPassword():
+    data = request.get_json()
+    return reset_password(data)
+
+
+@user_route.route("/api/v1/user/changePassword", methods=['POST'])
+@validate_token_admin
+def changePassword():
+    data = request.get_json()
+    return change_password(data)
 @user_route.route("/api/v1/user/editUser", methods=['POST'])
 @validate_token_admin
 def editUser():

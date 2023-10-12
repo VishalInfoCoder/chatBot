@@ -59,16 +59,43 @@ def forget_password(data):
         if not email_check:
             return {"message": "Email does not exists","status":False}
         else:
-            content = "Please click the link below to verify Your Email:"
-            link=os.environ.get('fronEndUrl')+"?token="+email_check.verify_id
+            content = "Please click the link below to change your password:"
+            link=os.environ.get('fronEndUrlPassword')+"?token="+email_check.verify_id
             html = f"<h3>{content}</h3> <br>{link}"
             subject = "Your link to reset password!"
             to_address = "vishallegend7775@gmail.com"
             receiver_username = email_check.name
             # Send the email and store the response
             send_reset_password_mail(subject, html, to_address, receiver_username)
-            return make_response({'message': 'Succesfully Created Please Verify The Email Sent To You!',"status":True}, 200)
+            return make_response({'message': 'An email link has been sent to your registered mail follow the link for further process! ',"status":True}, 200)
 
+    except Exception as e:
+        return make_response({'message': str(e)}, 404)
+def reset_password(data):
+    try:
+         email_check = Users.objects[:1](verify_id=data['verify_id'])
+         if not email_check:
+            return {"message": "Invalid Action","status":False}
+         else:
+            password = encrypt_password(data['password'])
+            email_check.password=password
+            email_check.save()
+            return make_response({'message': 'Password reset successfully!',"status":True}, 200)
+    except Exception as e:
+        return make_response({'message': str(e)}, 404)
+def change_password(data):
+    try:
+         email_check = Users.objects[:1](email=data['email'])
+         if not email_check:
+            return {"message": "Invalid Action","status":False}
+         else:
+            if compare_passwords(email_check['password'], data['oldPassword']):
+                password = encrypt_password(data['newPassword'])
+                email_check.password=password
+                email_check.save()
+                return make_response({'message': 'Password reset successfully!',"status":True}, 200)
+            else:
+                return make_response({'message': 'Oldpassword Mismatch!',"status":True}, 200)
     except Exception as e:
         return make_response({'message': str(e)}, 404)
 def login_service(user_credentials):
