@@ -237,15 +237,18 @@ def get_all_links(data):
         html_page = urlopen(req)
         
         soup = BeautifulSoup(html_page, "lxml")
-       
+
         links_with_lengths = []
+        print("here")
         for link in soup.findAll('a'):
             href = link.get('href')
             href = clean_url(href)  # Clean the URL
             if is_valid_url(href):
                 loader = WebBaseLoader(href)
                 docs = loader.load()
-                links_with_lengths.append({"href": href, "length": len(docs[0].page_content)})
+                if(len(docs[0].page_content)!=0):
+                    links_with_lengths.append({"href": href, "length": len(docs[0].page_content)})
+            time.sleep(1)
         
         return make_response({"data": links_with_lengths, "status": True}, 200)
     except Exception as e:
@@ -307,7 +310,8 @@ def delete_website_links(data):
         else: 
             bot_website =[{'_id': str(item['_id']), 'url': item['url'], 'user_id': item['user_id']} for item in isBot.websiteData]
             newdata[:] = [item for item in bot_website if item["_id"] != data['web_id']]
-            isBot.text=newdata
+            print(newdata)
+            isBot.websiteData=newdata
             delete_embedding(isBot.key)
             mylinks = [item["href"] for item in newdata]
             text=getTexts(mylinks)
