@@ -12,6 +12,11 @@ class chatBots(Document):
         user_id=ObjectIdField(),
         title=StringField()
     ))
+    websiteData=ListField(DictField(
+        _id=ObjectIdField(),
+        url=StringField(),
+        user_id=ObjectIdField(),
+    ))
     validityStartDate=DateTimeField(null=True)
     validityEndDate=DateTimeField(null=True)
     purpose=StringField(max_length=40,null=True)
@@ -26,6 +31,7 @@ class chatBots(Document):
     support_mobile=StringField(max_length=40)
     plan_name=StringField(max_length=40)
     theme=StringField(max_length=40)
+    intro_message=StringField()
     facebookData=DictField(
         fbAppId=StringField(),
         fbAppSecret=StringField(),

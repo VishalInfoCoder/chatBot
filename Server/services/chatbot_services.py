@@ -16,6 +16,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from chromadb.utils import embedding_functions
 from config import client
 from langchain.vectorstores import Chroma
+from langchain.document_loaders import WebBaseLoader
 import time
 from langchain.chains import RetrievalQA
 from langchain.chains import ConversationalRetrievalChain
@@ -26,14 +27,19 @@ from langchain.chains import LLMChain
 from langchain.llms import AzureOpenAI
 import openai 
 from langchain.embeddings.openai import OpenAIEmbeddings
+from langchain.document_loaders import UnstructuredURLLoader
 import re
 from utils.sendMail import send_verification_quota
+from bs4 import BeautifulSoup
+from urllib.request import Request, urlopen
+import re
+from urllib.parse import urlparse
 
 os.environ["OPENAI_API_TYPE"] = "azure"
 os.environ["OPENAI_API_VERSION"] = "2023-05-15"
 os.environ["OPENAI_API_BASE"] = "https://ai-ramsol-traning.openai.azure.com/"
 os.environ["OPENAI_API_KEY"] = "5b60d2473952443cafceeee0b2797cf4"
-os.environ["HUGGINGFACEHUB_API_TOKEN"] = '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'
+# os.environ["HUGGINGFACEHUB_API_TOKEN"] = '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'
 
    
 openai_ef = embedding_functions.OpenAIEmbeddingFunction(
@@ -66,7 +72,7 @@ def checkReminder(bot):
             )
             html =email_content
             subject = "Quota Remainder!!"
-            to_address = "vishallegend7775@gmail.com"
+            to_address = myuser.email
             receiver_username = myuser.name
             # Send the email and store the response
             email_response = send_verification_quota(subject, html, to_address, receiver_username)
@@ -91,7 +97,7 @@ def checkReminder(bot):
             )
             html = email_content
             subject = "Quota Remainder!!"
-            to_address = "vishallegend7775@gmail.com"
+            to_address = myuser.email
             receiver_username = myuser.name
             # Send the email and store the response
             email_response = send_verification_quota(subject, html, to_address, receiver_username)
@@ -125,13 +131,21 @@ def get_Answer(data):
             
             token="500"
             retriever = db4.as_retriever()
-            template = """Use the following pieces of context to answer the question at the end. 
-                        If you don't know the answer, just say that you don't know, don't try to make up an answer. 
-                        Use as much details as possible when responding.
-                        Use bullet points if you have to make a list, only if necessary. 
-                        Context: {context}
-                        Question: {question}
-                        """
+            # template = """Use the following pieces of context to answer the question at the end. 
+            #             If you don't know the answer, just say that you don't know, don't try to make up an answer. 
+            #             Use as much details as possible when responding.
+            #             Use bullet points if you have to make a list, only if necessary. 
+            #             Context: {context}
+            #             Question: {question}
+            #             """
+            template=    """Use the following pieces of context to answer the question at the end, keeping in mind the following instructions:
+                            Answer maximum 500 words.
+                            If you don't know the answer, just say that you don't know politely, don't try to make up an answer.
+                            Use bullet points if you have to make a list, only if necessary.
+                            Use as much details as possible when responding, even if there is not enough context.
+                            Do not ask any questions from the customer.
+                            Context: {context}
+                            Question: {question}"""
         
 
             QA_CHAIN_PROMPT = PromptTemplate.from_template(template)
@@ -142,7 +156,6 @@ def get_Answer(data):
                     model_name="gpt-35-turbo", 
                     temperature=0.5,
                 )
-            
             memory=ConversationBufferMemory(memory_key='chat_history', return_messages=True)
 
             qa_chain = ConversationalRetrievalChain.from_llm(
@@ -188,7 +201,6 @@ def saveText(key,text):
         print("Inserted documents for ", uuid_val)
         collection.add(ids=[str(uuid_val)], documents=doc.page_content)
         time.sleep(1)
- 
     return jsonify({'status': True})
 
 def resaveText(key,text):
@@ -209,6 +221,106 @@ def resaveText(key,text):
         collection.add(ids=[str(uuid_val)], documents=doc.page_content)
  
     return jsonify({'status': True})
+def delete_embedding(key):
+    client.delete_collection(name=key)
+def getTexts(urls):
+    try:
+        loaders=UnstructuredURLLoader(urls=urls)
+        data=loaders.load()
+        return data[0].page_content
+    except Exception as e:
+        print(e)
+        return make_response({'message': str(e), "status": False})    
+def get_all_links(data):
+    try:
+        req = Request(data['link'])
+        html_page = urlopen(req)
+        
+        soup = BeautifulSoup(html_page, "lxml")
+       
+        links_with_lengths = []
+        for link in soup.findAll('a'):
+            href = link.get('href')
+            href = clean_url(href)  # Clean the URL
+            if is_valid_url(href):
+                loader = WebBaseLoader(href)
+                docs = loader.load()
+                links_with_lengths.append({"href": href, "length": len(docs[0].page_content)})
+        
+        return make_response({"data": links_with_lengths, "status": True}, 200)
+    except Exception as e:
+        print(e)
+        return make_response({'message': str(e), "status": False})
+def is_valid_url(url):
+    try:
+        result = urlparse(url)
+        return all([result.scheme, result.netloc])
+    except ValueError:
+        return False
+
+def clean_url(url, default_scheme="https"):
+    if url is not None:
+        url = url.strip()
+        if not url.startswith("http://") and not url.startswith("https://"):
+            url = f"{default_scheme}://{url}"
+    return url
+def save_webist_links(data):
+    try:
+        isBot = chatBots.objects[:1](id=data['id'],user_id=session['user_id']).first()
+        if not isBot:
+            return {"message": "User does not exists","status":False}
+        links=data['links']
+        websiteData=[]
+        linkdata={}
+        mylinks=[]
+        mylinks = [item["href"] for item in links]
+        text=getTexts(mylinks)
+        saveText(isBot.key,text)
+        for link in links:      
+            linkdata['_id'] = ObjectId()
+            linkdata['url']=link['href']
+            linkdata['user_id']=session['user_id']
+            websiteData.append(linkdata)
+        isBot.websiteData=websiteData
+        isBot.save()
+        return make_response({"message":"Website data added successfully","status":True}, 200)
+    except Exception as e:
+        print(e)
+        return make_response({'message': str(e),"status":False})
+def get_webiste_links(data):
+    try:
+        isBot = chatBots.objects[:1](id=data['id'],user_id=session['user_id']).first()
+        if not isBot:
+            return {"message": "User does not exists","status":False}
+        bot_data={}
+        bot_data['text'] = [{'_id': str(item['_id']), 'url': item['url'], 'user_id': item['user_id']} for item in isBot.websiteData]
+        return make_response({"data":bot_data,"status":True}, 200)
+    except Exception as e:
+        print(e)
+        return make_response({'message': str(e),"status":False})
+def delete_website_links(data):
+    try:
+        newdata=[]
+        isBot = chatBots.objects[:1](id=data['id'],user_id=session['user_id']).first()
+        if not isBot:
+            return {"message": "chatBot does not exists","status":False}
+        else: 
+            bot_website =[{'_id': str(item['_id']), 'url': item['url'], 'user_id': item['user_id']} for item in isBot.websiteData]
+            newdata[:] = [item for item in bot_website if item["_id"] != data['web_id']]
+            isBot.text=newdata
+            delete_embedding(isBot.key)
+            mylinks = [item["href"] for item in newdata]
+            text=getTexts(mylinks)
+            saveText(isBot.key,text)
+            textdata='\n'.join(item['text_data'] for item in isBot.text)
+            if (len(textdata)==0):
+                 return {"message": "ChatBot Text Removed Successfully","status":True}
+            else:
+                resaveText(isBot.key,textdata)
+                return {"message": "ChatBot Text Removed Successfully","status":True}
+    except Exception as e:
+        print(e)
+        return make_response({'message': str(e),"status":False})        
 def add_chatbot_support(data):
     try:
        is_bot=chatBots.objects[:1](id=data['id'],user_id=session['user_id']).first()
@@ -270,6 +382,7 @@ def get_ChatBot(botdata):
             bot_data['support_name']=isBot.support_name
             bot_data['support_email']=isBot.support_email
             bot_data['support_mobile']=isBot.support_mobile
+            bot_data['intro_message']=isBot.intro_message
             bot_data['theme']=isBot.theme
             bot_data['key']=isBot.key 
             if isBot.avatar_image :
@@ -307,11 +420,11 @@ def get_all_ChatBot():
 def edit_ChatBot(editdata):
     try:
         myResponse=[]
-        isBot = chatBots.objects[:1](id=editdata['id'],user_id=session['user_id'])
+        isBot = chatBots.objects[:1](id=editdata['id'],user_id=session['user_id']).first()
         if not isBot:
             return {"message": "User does not exists","status":False}
         else: 
-            isBot.update(name=editdata['name'],purpose=editdata['purpose'])
+            isBot.update(name=editdata['name'],purpose=editdata['purpose'],intro_message=editdata['intro_message'])
             return make_response({'message': 'Succesfully Edited',"status":True}, 200) 
     except Exception as e:
         print(e)
@@ -395,7 +508,7 @@ def delete_ChatBot_text(textData):
             isBot.used_characters=newCount
             isBot.save()
             textdata='\n'.join(item['text_data'] for item in isBot.text)
-            if (len(textData)==0):
+            if (len(textdata)==0):
                  return {"message": "ChatBot Text Removed Successfully","status":True}
             else:
                 resaveText(isBot.key,textdata)

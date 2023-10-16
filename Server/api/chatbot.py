@@ -1,5 +1,5 @@
 from flask import Blueprint, request,jsonify, make_response,session
-from services.chatbot_services import add_ChatBot,get_ChatBot,get_all_ChatBot,edit_ChatBot,add_ChatBot_text,get_ChatBot_text,delete_ChatBot_text,add_chatbot_avatar,get_Answer,get_history,get_chatBot_Bykey,update_company_details,get_chatBot_plan,get_chat_users,add_chatbot_support,set_chat_bot_theme,setup_facebook_data,get_facebook_data
+from services.chatbot_services import add_ChatBot,get_ChatBot,get_all_ChatBot,edit_ChatBot,add_ChatBot_text,get_ChatBot_text,delete_ChatBot_text,add_chatbot_avatar,get_Answer,get_history,get_chatBot_Bykey,update_company_details,get_chatBot_plan,get_chat_users,add_chatbot_support,set_chat_bot_theme,setup_facebook_data,get_facebook_data,get_all_links,save_webist_links,get_webiste_links
 chatbot_route = Blueprint('chatbot_route', __name__)
 from utils.JwtToken import validate_token_admin,validate_apiKey
 
@@ -141,6 +141,33 @@ def getFacebookData():
     try:
         data = request.get_json()
         return get_facebook_data(data)    
+    except Exception as e:
+            print(e)
+            return make_response({'message': str(e)}, 404)
+@chatbot_route.route('/api/v1/chatbot/getAllLinks', methods=['GET', 'POST'])
+@validate_token_admin
+def getAllLinks():
+    try:
+        data = request.get_json()
+        return get_all_links(data)    
+    except Exception as e:
+            print(e)
+            return make_response({'message': str(e)}, 404)#
+@chatbot_route.route('/api/v1/chatbot/saveWebistLinks', methods=['GET', 'POST'])
+@validate_token_admin
+def saveWebistLinks():
+    try:
+        data = request.get_json()
+        return save_webist_links(data)    
+    except Exception as e:
+            print(e)
+            return make_response({'message': str(e)}, 404)  #
+@chatbot_route.route('/api/v1/chatbot/getWebisteLinks', methods=['GET', 'POST'])
+@validate_token_admin
+def getWebisteLinks():
+    try:
+        data = request.get_json()
+        return get_webiste_links(data)    
     except Exception as e:
             print(e)
             return make_response({'message': str(e)}, 404)

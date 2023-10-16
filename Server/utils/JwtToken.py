@@ -74,6 +74,7 @@ def validate_apiKey(func):
                     bot_data['company_description']=isBot.company_description
                     bot_data['support_name']=isBot.support_name
                     bot_data['support_email']=isBot.support_email
+                    bot_data['intro_message']=isBot.intro_message
                     bot_data['support_mobile']=isBot.support_mobile
                     session['myBot'] = bot_data
                     return func(*args, **kwargs)

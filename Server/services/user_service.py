@@ -51,7 +51,7 @@ def signup_service(userdata):
             )
             html=email_content
             subject = "Registration Successfull!"
-            to_address = "vishallegend7775@gmail.com"
+            to_address = email
             receiver_username = name
             # Send the email and store the response
             send_verification_email(subject, html, to_address, receiver_username)
@@ -75,7 +75,7 @@ def forget_password(data):
             )
             html=email_content
             subject = "Your link to reset password!"
-            to_address = "vishallegend7775@gmail.com"
+            to_address = myuser.email
             receiver_username = myuser.name
             # Send the email and store the response
             send_reset_password_mail(subject, html, to_address, receiver_username)
