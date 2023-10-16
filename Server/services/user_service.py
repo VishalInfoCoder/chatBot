@@ -107,7 +107,7 @@ def change_password(data):
             else:
                 return make_response({'message': 'Oldpassword Mismatch!',"status":True}, 200)
     except Exception as e:
-        print(e)
+       
         return make_response({'message': str(e)}, 404)
 def login_service(user_credentials):
     try:
@@ -164,7 +164,7 @@ def get_user(viewdata):
                 else:
                     return make_response({"data":myResponse,"status":True}, 200)    
     except Exception as e:
-        print(e)
+       
         return make_response({'message': str(e)}, 404)
 def get_all_user(viewdata): 
     try:
@@ -183,7 +183,7 @@ def get_all_user(viewdata):
                 myResponse.append(user_data)          
         return make_response({"data":myResponse,"status":True}, 200)         
     except Exception as e:
-        print(e)
+       
         return make_response({'message': str(e)}, 404)
 def update_userStatus(viewdata): 
     try:
@@ -198,5 +198,5 @@ def update_userStatus(viewdata):
                 is_user.update(is_Active=0)    
                 return make_response({"message":"User Changed to Inactive","status":True}, 200)         
     except Exception as e:
-        print(e)
+      
         return make_response({'message': str(e)}, 404)    

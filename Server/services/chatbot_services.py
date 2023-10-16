@@ -50,7 +50,7 @@ openai_ef = embedding_functions.OpenAIEmbeddingFunction(
                  model_name="embedding-dev")
 def checkReminder(bot):
     try:
-        print("here")
+       
         if int(bot['questions'])==50:
             # Get the current date and time
             now = datetime.datetime.now()
@@ -104,7 +104,6 @@ def checkReminder(bot):
         else:
             return False    
     except Exception as e: 
-        print(e)
         return make_response({'message': str(e),"status":False})     
 def get_Answer(data):
     try:
@@ -118,7 +117,7 @@ def get_Answer(data):
             checkReminder(theBot)
             #embedding_function = OpenAIEmbeddings()
             #embedding_function = OpenAIEmbeddings()
-            print(data['question'])
+           
             embedding_function = OpenAIEmbeddings(
                         api_key="5b60d2473952443cafceeee0b2797cf4",
                         openai_api_base="https://ai-ramsol-traning.openai.azure.com/",
@@ -126,7 +125,7 @@ def get_Answer(data):
                         api_version="2023-05-15",
                         deployment="embedding-dev",
                         model="text-embedding-ada-002")
-            print(theBot['key'])
+           
             db4 = Chroma(client=client, collection_name=theBot['key'], embedding_function=embedding_function)
             
             token="500"
@@ -162,7 +161,7 @@ def get_Answer(data):
                     llm,
                     retriever=retriever,
                 # chain_type_kwargs={"prompt": QA_CHAIN_PROMPT},
-                    verbose=True,
+                    verbose=False,
                     combine_docs_chain_kwargs={"prompt": QA_CHAIN_PROMPT},
                     memory=memory
                 )
@@ -178,17 +177,17 @@ def get_Answer(data):
             updateBot(theBot)
 
             # paragraphs = re.split(r'\.\s+', result['answer'])
-            print(result['answer'])
+           
             return make_response({'message':result['answer'] ,"status":True}) 
         else:
             return {'message': "No questions left to ask","status":False}
     except Exception as e: 
-        print(e)
+        
         return make_response({'message': str(e),"status":False}) 
 def saveText(key,text):
     #client = chromadb.HttpClient(host="localhost", port=8000)
     collection = client.get_or_create_collection(name=key, embedding_function=openai_ef)
-    print(collection.count())
+   
 
     content =  text
 
@@ -198,7 +197,7 @@ def saveText(key,text):
 
     for doc in docs:
         uuid_val = uuid.uuid1()
-        print("Inserted documents for ", uuid_val)
+       
         collection.add(ids=[str(uuid_val)], documents=doc.page_content)
         time.sleep(1)
     return jsonify({'status': True})
@@ -207,7 +206,7 @@ def resaveText(key,text):
     client.delete_collection(name=key)
 
     collection = client.get_or_create_collection(name=key, embedding_function=openai_ef)
-    print(collection.count())
+   
 
     content =  text
 
@@ -217,7 +216,7 @@ def resaveText(key,text):
 
     for doc in docs:
         uuid_val = uuid.uuid1()
-        print("Inserted documents for ", uuid_val)
+       
         collection.add(ids=[str(uuid_val)], documents=doc.page_content)
  
     return jsonify({'status': True})
@@ -229,7 +228,7 @@ def getTexts(urls):
         data=loaders.load()
         return data[0].page_content
     except Exception as e:
-        print(e)
+       
         return make_response({'message': str(e), "status": False})    
 def get_all_links(data):
     try:
@@ -243,23 +242,23 @@ def get_all_links(data):
 
         for link in soup.findAll('a'):
             href = link.get('href')
-            href = clean_url(href)  # Clean the URL
+            cleaned_href = clean_url(href)  # Clean the URL
 
             # Check if the cleaned href is not in the set of seen_hrefs
-            if href not in seen_hrefs and is_valid_url(href):
-                loader = WebBaseLoader(href)
+            if cleaned_href not in seen_hrefs and is_valid_url(cleaned_href) and cleaned_href.startswith('https://'):
+                loader = WebBaseLoader(cleaned_href)
                 docs = loader.load()
                 if len(docs[0].page_content) != 0:
-                    links_with_lengths.append({"href": href, "length": len(docs[0].page_content)})
+                    links_with_lengths.append({"href": cleaned_href, "length": len(docs[0].page_content)})
                 
-                # Add the href to the set of seen_hrefs to mark it as seen
-                seen_hrefs.add(href)
+                # Add the cleaned_href to the set of seen_hrefs to mark it as seen
+                seen_hrefs.add(cleaned_href)
 
             time.sleep(1)
         
         return make_response({"data": links_with_lengths, "status": True}, 200)
     except Exception as e:
-        print(e)
+        
         return make_response({'message': str(e), "status": False})
 def is_valid_url(url):
     try:
@@ -281,21 +280,21 @@ def save_webist_links(data):
             return {"message": "User does not exists","status":False}
         links=data['links']
         websiteData=[]
-        linkdata={}
         mylinks=[]
         mylinks = [item["href"] for item in links]
         text=getTexts(mylinks)
         saveText(isBot.key,text)
-        for link in links:      
-            linkdata['_id'] = ObjectId()
+        for link in links:   
+            linkdata = {}   
+            linkdata['_id']= ObjectId()
             linkdata['url']=link['href']
             linkdata['user_id']=session['user_id']
-            websiteData.append(linkdata)
+            websiteData.append(linkdata) 
         isBot.websiteData=websiteData
         isBot.save()
         return make_response({"message":"Website data added successfully","status":True}, 200)
     except Exception as e:
-        print(e)
+        
         return make_response({'message': str(e),"status":False})
 def get_webiste_links(data):
     try:
@@ -306,7 +305,7 @@ def get_webiste_links(data):
         bot_data['text'] = [{'_id': str(item['_id']), 'url': item['url'], 'user_id': item['user_id']} for item in isBot.websiteData]
         return make_response({"data":bot_data,"status":True}, 200)
     except Exception as e:
-        print(e)
+        
         return make_response({'message': str(e),"status":False})
 def delete_website_links(data):
     try:
@@ -317,20 +316,22 @@ def delete_website_links(data):
         else: 
             bot_website =[{'_id': str(item['_id']), 'url': item['url'], 'user_id': item['user_id']} for item in isBot.websiteData]
             newdata[:] = [item for item in bot_website if item["_id"] != data['web_id']]
-            print(newdata)
+           
             isBot.websiteData=newdata
             delete_embedding(isBot.key)
-            mylinks = [item["href"] for item in newdata]
+            mylinks = [item["url"] for item in newdata]
             text=getTexts(mylinks)
             saveText(isBot.key,text)
             textdata='\n'.join(item['text_data'] for item in isBot.text)
             if (len(textdata)==0):
-                 return {"message": "ChatBot Text Removed Successfully","status":True}
+                isBot.save() 
+                return {"message": "Website Link Removed Successfully_1","status":True}
             else:
+                isBot.save()
                 resaveText(isBot.key,textdata)
-                return {"message": "ChatBot Text Removed Successfully","status":True}
+                return {"message": "Website Link Removed Successfully_2","status":True}
     except Exception as e:
-        print(e)
+      
         return make_response({'message': str(e),"status":False})        
 def add_chatbot_support(data):
     try:
@@ -344,7 +345,7 @@ def add_chatbot_support(data):
            is_bot.save()
            return {"message": "Support Information Updated!","status":True}
     except Exception as e:
-        print(e)
+       
         return make_response({'message': str(e),"status":False})    
 def add_ChatBot(botdata):
     try:
@@ -368,7 +369,7 @@ def add_ChatBot(botdata):
             chatbot.update(key=final_key)
             return {"message": "Success","data":str(chatbot.id),"status":True}
     except Exception as e:
-        print(e)
+        
         return make_response({'message': str(e),"status":False})      
 def get_ChatBot(botdata):
     try:
@@ -401,7 +402,7 @@ def get_ChatBot(botdata):
             bot_data['created'] = isBot.created.isoformat()
             return make_response({"data":bot_data,"status":True}, 200)   
     except Exception as e:
-        print(e)
+       
         return make_response({'message': str(e)}, 404)
 def get_all_ChatBot():
     try:
@@ -426,7 +427,7 @@ def get_all_ChatBot():
                 myResponse.append(bot_data)
             return make_response({"data":myResponse,"status":True}, 200)    
     except Exception as e:
-        print(e)
+        
         return make_response({'message': str(e)}, 404)
 def edit_ChatBot(editdata):
     try:
@@ -438,7 +439,7 @@ def edit_ChatBot(editdata):
             isBot.update(name=editdata['name'],purpose=editdata['purpose'],intro_message=editdata['intro_message'])
             return make_response({'message': 'Succesfully Edited',"status":True}, 200) 
     except Exception as e:
-        print(e)
+        
         return make_response({'message': str(e)}, 404)
 def get_ChatBot_text(textData):
     try:
@@ -449,7 +450,7 @@ def get_ChatBot_text(textData):
             botData = [{'_id': str(item['_id']), 'text_data': item['text_data'], 'title': item['title'], 'user_id': item['user_id']} for item in isBot.text]
             return make_response({'data':botData ,"status":True}, 200) 
     except Exception as e:
-        print(e)
+       
         return make_response({'message': str(e)}, 404)    
 def add_ChatBot_text(textData):
     try:
@@ -467,7 +468,7 @@ def add_ChatBot_text(textData):
                     saveData['text_data'] = textData['text']
                     saveData['title'] = textData['title']
                     saveData['user_id'] = session['user_id']
-                    print(saveData) 
+                    
                     isBot.text.append(saveData)
                     isBot.used_characters=isBot.used_characters+len(textData['text'])
                     isBot.save()    
@@ -479,7 +480,7 @@ def add_ChatBot_text(textData):
             else:
                 return {'message': "Limit Exceeded","status":False}
     except Exception as e:
-        print(e)
+      
         return make_response({'message': str(e)}, 404)   
 def add_chatbot_avatar(textData):
     try:
@@ -493,9 +494,9 @@ def add_chatbot_avatar(textData):
         if file.filename == '':
             return jsonify({'message': 'No selected file',"status":False})
         current_time = str(datetime.datetime.now().timestamp())
-        print(current_time)
+       
         filename = secure_filename(f"{session['user_id']}_{current_time}_{file.filename}")
-        print(filename)
+      
         if file:
             filename = os.path.join("assets/images/", filename)
             isBot.avatar_image=filename
@@ -503,7 +504,7 @@ def add_chatbot_avatar(textData):
             isBot.save()
             return jsonify({'message': 'File uploaded successfully',"status":True})
     except Exception as e:
-        print(e)
+       
         return make_response({'message': str(e)}, 404)   
 def delete_ChatBot_text(textData): 
     try:
@@ -525,7 +526,7 @@ def delete_ChatBot_text(textData):
                 resaveText(isBot.key,textdata)
                 return {"message": "ChatBot Text Removed Successfully","status":True}
     except Exception as e:
-        print(e)
+       
         return make_response({'message': str(e)}, 404)       
 def get_history(data):
     try:
@@ -536,16 +537,16 @@ def get_history(data):
          botHistory = [{'_id': str(item['_id']), 'question': item['question'], 'answer': item['answer'],'created':item['created']} for item in isUser.history]
          return make_response({"data": botHistory,"status":True}) 
     except Exception as e:
-            print(e)
+            
             return make_response({'message': str(e)}, 404) 
 def get_chatBot_Bykey():
     try:
-        print("in")
+       
         theBot=session['myBot']
         
         return make_response({"data": theBot,"status":True}) 
     except Exception as e:
-            print(e)
+           
             return make_response({'message': str(e)}, 404) 
     
 def updateBot(data):
@@ -566,7 +567,7 @@ def update_company_details(data):
             isBot.save()
             return {"message": "Company Data Saved","status":True} 
     except Exception as e:
-            print(e)
+            
             return make_response({'message': str(e)}, 404)     
 def get_chatBot_plan(data):
     try:
@@ -581,7 +582,7 @@ def get_chatBot_plan(data):
             else:
                 return {"message": "No plan found! Please upgrade.","status":False}
     except Exception as e:
-            print(e)
+            
             return make_response({'message': str(e)}, 404) 
 def get_chat_users(data):
     try:
@@ -599,7 +600,7 @@ def get_chat_users(data):
            user_data= [{'id': str(item['id']), 'email': item['email']} for item in isBot]
            return make_response({"data": user_data,"count":count,"status":True})
     except Exception as e:
-            print(e)
+            
             return make_response({'message': str(e)}, 404)        
 def set_chat_bot_theme(data):
     try:
@@ -611,7 +612,7 @@ def set_chat_bot_theme(data):
             isBot.save()
             return {"message": "Theme Changed","status":True} 
     except Exception as e:
-            print(e)
+           
             return make_response({'message': str(e)}, 404)   
 def setup_facebook_data(data):
     try:
@@ -629,7 +630,7 @@ def setup_facebook_data(data):
             isBot.save()
             return {"message": "Successfully Added","status":True} 
     except Exception as e:
-            print(e)
+           
             return make_response({'message': str(e)}, 404)   
 def get_facebook_data(data):
     try:
@@ -649,5 +650,5 @@ def get_facebook_data(data):
             else:
                 return {"message": "Facebook not set up for this chatbot","status":False}
     except Exception as e:
-            print(e)
+           
             return make_response({'message': str(e)}, 404)   

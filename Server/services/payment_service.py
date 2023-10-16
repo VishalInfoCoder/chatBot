@@ -32,7 +32,7 @@ def initiate_transaction(transaction_data):
         else:
             return {"message": "Plan Not Found","status":False}    
     except Exception as e:
-        print(e)
+       
         return make_response({'message': str(e)}, 404)     
 def get_PaymentSuccess(success_data):
     # Initialize the Razorpay client with your API key and secret key
@@ -66,7 +66,7 @@ def get_PaymentSuccess(success_data):
         # Access payment details
         return {"message":"Upgraded Successfully","status":True}
     except Exception as e:
-        print(f"An error occurred: {str(e)}")    
+       
         return {'message': str(e),"status":False}
 
 def razorPayInitiate(transaction_details):
@@ -100,7 +100,7 @@ def view_all_plans():
             myResponse.insert(0, myResponse.pop())    
             return make_response({"data":myResponse,"status":True}, 200)        
     except Exception as e:
-        print(e)
+        
         return make_response({'message': str(e)}, 404)    
 def set_invoiceNumber(i):
     i=int(i)
@@ -120,7 +120,7 @@ def updateChatBot(chatbot_id,plan):
         bot_data=chatBots.objects[:1](id=chatbot_id).first()
         current_date = datetime.datetime.utcnow() 
         new_date = current_date + timedelta(days=30)
-        print (bot_data['validityEndDate'])
+       
         if bot_data['validityEndDate'] is None:
             bot_data.questions = int(plan['questions'])
             bot_data.allowed_characters = int(plan['token_limit'])
@@ -146,7 +146,7 @@ def updateChatBot(chatbot_id,plan):
             bot_data.save()
         return True
     except Exception as e:
-        print(e)
+       
         return False
 def view_all_transactions(userdata):
     try:
@@ -162,7 +162,7 @@ def view_all_transactions(userdata):
         myResponse.extend([{'_id':str(transaction_data.id),'user_id': str(transaction_data.user_id), 'total_amount': transaction_data.total_amount, 'basic_amount': transaction_data.basic_amount, 'tax_percentage': transaction_data.tax_percentage, 'total_tax_values': transaction_data.total_tax_values, 'cgst': transaction_data.cgst,'sgst': transaction_data.sgst, 'invoice_number': transaction_data.invoice_number,'payment_details': transaction_data.payment_details, 'created': transaction_data.created} for transaction_data in data])
         return make_response({"data":myResponse,"count":total_count,"status":True}, 200)
     except Exception as e:
-        print(e)
+       
         return make_response({'message': str(e)}, 404) 
 def view_transaction(userdata):
     try:
@@ -171,5 +171,5 @@ def view_transaction(userdata):
         myResponse={'_id':str(transaction_data.id),'user_id': str(transaction_data.user_id), 'total_amount': transaction_data.total_amount, 'basic_amount': transaction_data.basic_amount, 'tax_percentage': transaction_data.tax_percentage, 'total_tax_values': transaction_data.total_tax_values, 'cgst': transaction_data.cgst,'sgst': transaction_data.sgst, 'invoice_number': transaction_data.invoice_number,'payment_details': transaction_data.payment_details, 'created': transaction_data.created}
         return make_response({"data":myResponse,"status":True}, 200)
     except Exception as e:
-        print(e)
+       
         return make_response({'message': str(e)}, 404) 
