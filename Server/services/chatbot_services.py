@@ -238,16 +238,23 @@ def get_all_links(data):
         
         soup = BeautifulSoup(html_page, "lxml")
 
-        links_with_lengths = []
-        print("here")
+        links_with_lengths = []  # Initialize the list
+        seen_hrefs = set()       # Initialize a set to track unique href values
+
         for link in soup.findAll('a'):
             href = link.get('href')
             href = clean_url(href)  # Clean the URL
-            if is_valid_url(href):
+
+            # Check if the cleaned href is not in the set of seen_hrefs
+            if href not in seen_hrefs and is_valid_url(href):
                 loader = WebBaseLoader(href)
                 docs = loader.load()
-                if(len(docs[0].page_content)!=0):
+                if len(docs[0].page_content) != 0:
                     links_with_lengths.append({"href": href, "length": len(docs[0].page_content)})
+                
+                # Add the href to the set of seen_hrefs to mark it as seen
+                seen_hrefs.add(href)
+
             time.sleep(1)
         
         return make_response({"data": links_with_lengths, "status": True}, 200)
