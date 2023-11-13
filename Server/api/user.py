@@ -1,5 +1,6 @@
 from flask import Blueprint, request
-from services.user_service import signup_service,login_service,edit_user,get_user,get_all_user,update_userStatus,verify_email,forget_password,reset_password,change_password
+from services.user_service import signup_service,login_service,edit_user,get_user,update_userStatus,verify_email,forget_password,reset_password,change_password
+from services.user_service import google_login,facebook_login,update_referal_code
 user_route = Blueprint('user_route', __name__)
 from utils.JwtToken import validate_token_admin
 
@@ -12,6 +13,15 @@ def signup():
 def login():
     data = request.get_json()
     return login_service(data)
+@user_route.route("/api/v1/user/googleLogin", methods=['POST'])
+def googleLogin():
+    data = request.get_json()
+    return google_login(data)
+@user_route.route("/api/v1/user/facebookLogin", methods=['POST'])
+def facebookLogin():
+    data = request.get_json()
+    return facebook_login(data)
+
 
 @user_route.route("/api/v1/user/verifyEmail", methods=['POST'])
 def verifyEmail():
@@ -34,6 +44,13 @@ def resetPassword():
 def changePassword():
     data = request.get_json()
     return change_password(data)
+
+@user_route.route("/api/v1/user/updateReferalCode", methods=['POST'])
+@validate_token_admin
+def updateReferalCode():
+    data = request.get_json()
+    return update_referal_code(data)
+
 @user_route.route("/api/v1/user/editUser", methods=['POST'])
 @validate_token_admin
 def editUser():
@@ -46,11 +63,7 @@ def getUser():
     data = request.get_json() 
     return get_user(data)
 
-@user_route.route("/api/v1/user/getAllUser", methods=['POST'])
-@validate_token_admin
-def getAllUser():
-    data = request.get_json() 
-    return get_all_user(data)
+
 @user_route.route("/api/v1/user/updateUserStatus", methods=['POST'])
 @validate_token_admin
 def updateUserStatus():

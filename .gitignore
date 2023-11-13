@@ -7,7 +7,7 @@ __init__.py
 # Logs and databases
 *.log
 *.db
-
+.json
 # Local configuration files
 instance/
 *.ini

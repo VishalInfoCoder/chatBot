@@ -2,11 +2,11 @@ from mongoengine import Document, StringField, EmailField,BooleanField,DateTimeF
 from bson import ObjectId
 import datetime
 class userChatHistory(Document):
-    title=StringField(required=True, max_length=250)
+    phonenumbeId=StringField(required=True, max_length=250)
+    phonenumber=StringField()
     category=StringField()
     history=ListField(DictField(
         _id=ObjectIdField(),
-        phonenumberId=StringField(),
         waMessageId=StringField(),
         question=StringField(),
         answer=StringField(),

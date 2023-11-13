@@ -15,6 +15,7 @@ class User_invoices(Document):
     year=StringField(required=True, max_length=40)
     inv_int=IntField(required=True, max_length=40)
     plan_id=ObjectIdField(required=True)
+    refered_by=StringField( max_length=20)
     payment_details=DictField(max_length=50)
     created = DateTimeField(default=datetime.datetime.utcnow)
     updated = DateTimeField(default=datetime.datetime.utcnow)

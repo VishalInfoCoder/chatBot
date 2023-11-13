@@ -2,9 +2,12 @@ from model.chatbot import chatBots
 from model.plan import Plans
 from model.userChatHistory import userChatHistory
 from model.user import Users
-from flask import jsonify, make_response,session,Flask, render_template, request
+import json
+
+from flask import jsonify, make_response,session, render_template, request
 import os
 from werkzeug.utils import secure_filename
+from utils.functions import checkValidity,pdfReader,docuentReader,xlReader,xlsxReader
 import datetime
 import uuid
 import time
@@ -13,41 +16,35 @@ import string
 from datetime import timedelta
 from bson import ObjectId
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from chromadb.utils import embedding_functions
-from config import client
+
+from config import client,llm,openai_ef,embedding_function
 from langchain.vectorstores import Chroma
-from langchain.document_loaders import WebBaseLoader
 import time
-from langchain.chains import RetrievalQA
 from langchain.chains import ConversationalRetrievalChain
 from langchain.memory import ConversationBufferMemory
-from langchain.prompts.prompt import PromptTemplate
-from langchain.chat_models import ChatOpenAI
-from langchain.chains import LLMChain
-from langchain.llms import AzureOpenAI
-import openai 
-from langchain.embeddings.openai import OpenAIEmbeddings
-from langchain.document_loaders import UnstructuredURLLoader
-import re
+from langchain.document_loaders import AsyncChromiumLoader
+from langchain.document_transformers import BeautifulSoupTransformer
+from langchain.document_transformers import Html2TextTransformer
 from utils.sendMail import send_verification_quota
 from bs4 import BeautifulSoup
 from urllib.request import Request, urlopen
 import re
 from urllib.parse import urlparse
+import requests
+from langchain.prompts import (
+    ChatPromptTemplate,
+    SystemMessagePromptTemplate,
+    HumanMessagePromptTemplate,
+)
 
-os.environ["OPENAI_API_TYPE"] = "azure"
-os.environ["OPENAI_API_VERSION"] = "2023-05-15"
-os.environ["OPENAI_API_BASE"] = "https://ai-ramsol-traning.openai.azure.com/"
-os.environ["OPENAI_API_KEY"] = "5b60d2473952443cafceeee0b2797cf4"
-# os.environ["HUGGINGFACEHUB_API_TOKEN"] = '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'
+import urllib.request
+import ssl
+from bs4 import BeautifulSoup
+from urllib.parse import urlparse
 
+import pandas as pd
    
-openai_ef = embedding_functions.OpenAIEmbeddingFunction(
-                 api_key="5b60d2473952443cafceeee0b2797cf4",
-                 api_base="https://ai-ramsol-traning.openai.azure.com/",
-                 api_type="azure",
-                 api_version="2023-05-15",
-                 model_name="embedding-dev")
+
 def checkReminder(bot):
     try:
        
@@ -107,202 +104,234 @@ def checkReminder(bot):
         return make_response({'message': str(e),"status":False})     
 def get_Answer(data):
     try:
-        theBot=session['myBot']
-        isUser = userChatHistory.objects[:1](email=data['email'],user_id=theBot['user_id']).first()
-        if not isUser:
-            isUser=userChatHistory(email=data['email'],history=[],user_id=theBot['user_id'],chatbot_id=theBot['id'], category = 'website')
-            isUser.save()   
         question= data['question']
-        if int(theBot['questions'])>0:
-            checkReminder(theBot)
-            #embedding_function = OpenAIEmbeddings()
-            #embedding_function = OpenAIEmbeddings()
-           
-            embedding_function = OpenAIEmbeddings(
-                        api_key="5b60d2473952443cafceeee0b2797cf4",
-                        openai_api_base="https://ai-ramsol-traning.openai.azure.com/",
-                        openai_api_type="azure",
-                        api_version="2023-05-15",
-                        deployment="embedding-dev",
-                        model="text-embedding-ada-002")
-           
-            db4 = Chroma(client=client, collection_name=theBot['key'], embedding_function=embedding_function)
+        theBot=session['myBot']
+        isVaild=checkValidity(theBot['id'])
+        if isVaild:
+            if not data['session_id']:
+                isUser=userChatHistory(title=question,history=[],user_id=theBot['user_id'],chatbot_id=theBot['id'], category = 'website')
+                isUser.save()
+            else:
+                isUser = userChatHistory.objects[:1](id=data['session_id']).first()
+            if int(theBot['questions'])>0:
+                checkReminder(theBot)
+                #embedding_function = OpenAIEmbeddings()
+                #embedding_function = OpenAIEmbeddings()
             
-            token="500"
-            retriever = db4.as_retriever()
-            # template = """Use the following pieces of context to answer the question at the end. 
-            #             If you don't know the answer, just say that you don't know, don't try to make up an answer. 
-            #             Use as much details as possible when responding.
-            #             Use bullet points if you have to make a list, only if necessary. 
-            #             Context: {context}
-            #             Question: {question}
-            #             """
-            template=    """Use the following pieces of context to answer the question at the end, keeping in mind the following instructions:
-                            Answer maximum 500 words.
-                            If you don't know the answer, just say that you don't know politely, don't try to make up an answer.
-                            Use bullet points if you have to make a list, only if necessary.
-                            Use as much details as possible when responding, even if there is not enough context.
-                            Do not ask any questions from the customer.
-                            Context: {context}
-                            Question: {question}"""
+            
+                db4 = Chroma(client=client, collection_name=theBot['key'], embedding_function=embedding_function)
+                follow_guidelines = True
+                
+                prompt = ChatPromptTemplate(
+                messages=[
+                    SystemMessagePromptTemplate.from_template(
+                        "You are a nice chatbot having a conversation with a human. Follow these guidelines closely:Keep your response within a maximum of 100 words.Dont act like a third party conveying the message be the company's own chatbot AI.Respond to the user like a human if they talk generally and do not make up context out of the provided on.If you don't have the answer, politely state that you don't know, avoiding fabricated responses.Employ bullet points solely when essential, such as for creating lists.Provide as much detail as possible in your response, even when context is limited. Avoid asking any follow-up questions to the customer. Context: {context}"),
+                    # The `variable_name` here is what must align with memory
+                    #  MessagesPlaceholder(variable_name="chat_history"),
+                    HumanMessagePromptTemplate.from_template("{question}")
+                ]
+            )
+                # if follow_guidelines:
+                # # Add the guidelines template to the prompt
+                #     prompt.messages.insert(0, SystemMessagePromptTemplate.from_template("Follow the guidelines closely and very important thing is humbly decline answering general questions asked!"))
+                retriever = db4.as_retriever()
+                print(retriever)
+                memory=ConversationBufferMemory(memory_key='chat_history', return_messages=True)
         
-
-            QA_CHAIN_PROMPT = PromptTemplate.from_template(template)
-
-            
-            llm = ChatOpenAI(
-                    deployment_id="Ai-training-example",   
-                    model_name="gpt-35-turbo", 
-                    temperature=0.5,
-                )
-            memory=ConversationBufferMemory(memory_key='chat_history', return_messages=True)
-
-            qa_chain = ConversationalRetrievalChain.from_llm(
+                qa_chain = ConversationalRetrievalChain.from_llm(
                     llm,
                     retriever=retriever,
-                # chain_type_kwargs={"prompt": QA_CHAIN_PROMPT},
-                    verbose=False,
-                    combine_docs_chain_kwargs={"prompt": QA_CHAIN_PROMPT},
-                    memory=memory
+                    # chain_type_kwargs={"prompt": QA_CHAIN_PROMPT},
+                    verbose=True,
+                    combine_docs_chain_kwargs={"prompt": prompt}
+                    #memory=memory
                 )
-        
-            result = qa_chain({"question": question})
-            saveData={}
-            saveData['_id'] = ObjectId()
-            saveData['question'] = question
-            saveData['answer'] = result['answer']
-            saveData['created']=datetime.datetime.utcnow() 
-            isUser.history.append(saveData)
-            isUser.save()
-            updateBot(theBot)
+                if len(isUser.history)>0:
+                #conversation({"question": "hi"})
+                    my_history=[ ( item['question'], item['answer']) for item in isUser.history[-3:]]
+                    # my_history.insert(0, default_history)
+                    print(my_history)
+                    chain_input = {"question": question, "chat_history": my_history}
+                    result = qa_chain(chain_input)
+                else:
+                    my_history=[] 
+                    print(my_history)
+                    result = qa_chain({"question": question,"chat_history": my_history})
+                saveData={}
+                saveData['_id'] = ObjectId()
+                saveData['question'] = data['question']
+                saveData['answer'] = result['answer'] 
+                saveData['created']=datetime.datetime.utcnow() 
+                isUser.history.append(saveData)
+                isUser.save()
+                updateBot(theBot)
+                # session_data={}
+                # paragraphs = re.split(r'\.\s+', result['answer'])
 
-            # paragraphs = re.split(r'\.\s+', result['answer'])
-           
-            return make_response({'message':result['answer'] ,"status":True}) 
+                return make_response({'message':result['answer'] ,"status":True,"session_id":str(isUser.id)}) 
+            else:
+                return {'message': "No questions left to ask","status":False}
         else:
-            return {'message': "No questions left to ask","status":False}
+           response="Thank you for visiting! Our chatbot is currently under development and will be ready soon. We appreciate your patience and can't wait to assist you when it's up and running. If you need immediate help, please contact our support team. Thank you!"
+           return make_response({"message":response,"status":True})
     except Exception as e: 
-        
+        print(e)
         return make_response({'message': str(e),"status":False}) 
 def saveText(key,text):
     #client = chromadb.HttpClient(host="localhost", port=8000)
     collection = client.get_or_create_collection(name=key, embedding_function=openai_ef)
-   
-
     content =  text
-
     text_splitter = RecursiveCharacterTextSplitter(
          chunk_size=500, chunk_overlap=50)
     docs = text_splitter.create_documents([content])
-
+    collection_ids=[]  
     for doc in docs:
         uuid_val = uuid.uuid1()
-       
         collection.add(ids=[str(uuid_val)], documents=doc.page_content)
-        time.sleep(1)
-    return jsonify({'status': True})
+        collection_ids.append(str(uuid_val))
+        time.sleep(1)  
+    return collection_ids  
 
-def resaveText(key,text):
-    client.delete_collection(name=key)
-
-    collection = client.get_or_create_collection(name=key, embedding_function=openai_ef)
-   
-
-    content =  text
-
-    text_splitter = RecursiveCharacterTextSplitter(
-         chunk_size=500, chunk_overlap=50)
-    docs = text_splitter.create_documents([content])
-
-    for doc in docs:
-        uuid_val = uuid.uuid1()
-       
-        collection.add(ids=[str(uuid_val)], documents=doc.page_content)
- 
-    return jsonify({'status': True})
 def delete_embedding(key):
-    client.delete_collection(name=key)
-def getTexts(urls):
     try:
-        loaders=UnstructuredURLLoader(urls=urls)
-        data=loaders.load()
-        return data[0].page_content
+        if (client.get_collection(name=key)):
+            client.delete_collection(name=key)
     except Exception as e:
+       print(e)
+
+def valiadteSameUrl(Url,BaseUrl,cleanUrl)->bool:
+    if cleanUrl=="www."+BaseUrl:
+        return True
+    else:
+        switchUrl={
+            f"http://{BaseUrl}/":True,
+            f"https://{BaseUrl}/":True,
+            f"http://{BaseUrl}":True,
+            f"https://{BaseUrl}":True
+        }
+        return switchUrl.get(Url,False);
+def get_my_webLinks(data):
+    isBot = chatBots.objects[:1](id=data['id']).first()
+    isBot.update(botTraining="Pending")
+    # url = data['link']
+    # print(url)
+    # Send an HTTP GET request to the URL
+    # Create a request object and set a User-Agent header to mimic a web browser
+    links_with_lengths=[]
+    try:
+        totalChars=0
+        myUrls=testing_url(data['link'])
+        for url in myUrls:
+            loader = AsyncChromiumLoader([url])
+            html = loader.load()
+            html2text = Html2TextTransformer()
+            docs = html2text.transform_documents(html)
+            # print(docs[0].page_content)
+            # print(len(docs[0].page_content))
+            if len(docs[0].page_content) != 0:
+                vector_ids=saveText(isBot.key,docs[0].page_content)
+                totalChars+=len(docs[0].page_content)
+                if(isBot.used_characters+totalChars>=isBot.allowed_characters):
+                    totalChars-=len(docs[0].page_content)
+                    break
+                else:
+                    links_with_lengths.append({"_id":ObjectId(),"url": url, "user_id":isBot.user_id,"length": len(docs[0].page_content),"vector_ids":vector_ids})
+        print("done")
+        print(links_with_lengths)
+        print(totalChars)
+        isBot.websiteData=links_with_lengths
+        newCount=isBot.used_characters+totalChars
+        # isBot.save()
+        isBot.update(botTraining="Completed",websiteData=links_with_lengths,used_characters=newCount)
+        # return make_response({"data": 'data', "status": True}, 200)
+    except Exception as e:
+        print(e)
+        # return make_response({'message': str(e), "status": False})
+def ClearBaseUrl(url):
+    parsed_url = urlparse(url)
+    domain = parsed_url.netloc
+    cleanUrl=domain
+    # .replace("www.", "")
+    return cleanUrl
+
+
+def checkUrl(href,base_url):
+
+        notALink=["#","javascript:void(0)","\\'javascript:void(0);\\'","javascript:void(0);","None",None,base_url]
+        if(href not in notALink):
+            if (href.startswith("/") or href.startswith("./")):
+                if(href.startswith("./")):
+                    newurl=base_url+href[2:]
+                else:
+                    newurl=base_url+href[1:]
+                return newurl
+            else:
+                if(href.startswith("#")):
+                    return False
+                else:
+                    if(not href.startswith("http")):
+                        return False
+                    else:
+                        return href
+        else:
+            return False
+    
+
+
+def testing_url(url):
+    context = ssl._create_unverified_context()
+    base_url=url
+    weburl = urllib.request.urlopen(base_url, context=context)
+    html_page=str(weburl.read())
+    soup=BeautifulSoup(html_page,'lxml')
+    links=soup.findAll("a")
+    myset=set()
+    for link in links:
+        href=str(link.get("href")).lower()
+        ThisUrl=checkUrl(href,base_url)
+        if ThisUrl:
+            cleanUrl=ClearBaseUrl(ThisUrl)
+            BaseUrl=ClearBaseUrl(base_url)
+            if (cleanUrl in base_url) or (BaseUrl in cleanUrl):
+                if valiadteSameUrl(ThisUrl,BaseUrl,cleanUrl):
+                    print("Not in Url1: ",ThisUrl)
+                elif "?" in ThisUrl:
+                    myset.add(ThisUrl.split("?")[0])
+                else:
+                    myset.add(ThisUrl)
+
+    print(myset)
+    print(len(myset))
+    return myset
+
+
+def train_bot_text(data,update_id):
+    try:
+        print("here")
        
-        return make_response({'message': str(e), "status": False})    
-def get_all_links(data):
-    try:
-        req = Request(data['link'])
-        html_page = urlopen(req)
-        
-        soup = BeautifulSoup(html_page, "lxml")
-
-        links_with_lengths = []  # Initialize the list
-        seen_hrefs = set()       # Initialize a set to track unique href values
-
-        for link in soup.findAll('a'):
-            href = link.get('href')
-            cleaned_href = clean_url(href)  # Clean the URL
-
-            # Check if the cleaned href is not in the set of seen_hrefs
-            if cleaned_href not in seen_hrefs and is_valid_url(cleaned_href) and cleaned_href.startswith('https://'):
-                loader = WebBaseLoader(cleaned_href)
-                docs = loader.load()
-                if len(docs[0].page_content) != 0:
-                    links_with_lengths.append({"href": cleaned_href, "length": len(docs[0].page_content)})
-                
-                # Add the cleaned_href to the set of seen_hrefs to mark it as seen
-                seen_hrefs.add(cleaned_href)
-
-            time.sleep(1)
-        
-        return make_response({"data": links_with_lengths, "status": True}, 200)
-    except Exception as e:
-        
-        return make_response({'message': str(e), "status": False})
-def is_valid_url(url):
-    try:
-        result = urlparse(url)
-        return all([result.scheme, result.netloc])
-    except ValueError:
-        return False
-
-def clean_url(url, default_scheme="https"):
-    if url is not None:
-        url = url.strip()
-        if not url.startswith("http://") and not url.startswith("https://"):
-            url = f"{default_scheme}://{url}"
-    return url
-def save_webist_links(data):
-    try:
-        isBot = chatBots.objects[:1](id=data['id'],user_id=session['user_id']).first()
-        if not isBot:
-            return {"message": "User does not exists","status":False}
-        links=data['links']
-        websiteData=[]
-        mylinks=[]
-        mylinks = [item["href"] for item in links]
-        text=getTexts(mylinks)
-        saveText(isBot.key,text)
-        for link in links:   
-            linkdata = {}   
-            linkdata['_id']= ObjectId()
-            linkdata['url']=link['href']
-            linkdata['user_id']=session['user_id']
-            websiteData.append(linkdata) 
-        isBot.websiteData=websiteData
+        isBot = chatBots.objects[:1](id=data['id']).first()
+        # delete_embedding(isBot.key)
+        # return False
+        bot_text = [{'_id': str(item['_id']),
+             'text_data': item['text_data'], 
+             'title': item['title'],
+             'vector_ids': item.get('vector_ids', [])  # Use item.get() to provide a default value
+            } for item in isBot.text]
+        vector_id=saveText(isBot.key,data['text'])
+        new_bot_text=[{'_id': item['_id'], 'text_data': item['text_data'], 'title': item['title'], 'vector_ids': vector_id} if item['_id'] == update_id else item for item in bot_text]
+        isBot.used_characters+=len(data['text'])
+        isBot.text=new_bot_text
+        isBot.botTraining="Completed"
         isBot.save()
-        return make_response({"message":"Website data added successfully","status":True}, 200)
     except Exception as e:
-        
-        return make_response({'message': str(e),"status":False})
-def get_webiste_links(data):
+        print(e)
+def get_trained_webiste_links(data):
     try:
         isBot = chatBots.objects[:1](id=data['id'],user_id=session['user_id']).first()
         if not isBot:
             return {"message": "User does not exists","status":False}
         bot_data={}
-        bot_data['text'] = [{'_id': str(item['_id']), 'url': item['url'], 'user_id': item['user_id']} for item in isBot.websiteData]
+        bot_data = [{'_id': str(item['_id']), 'url': item['url'],'length':item['length'], 'user_id': str(item['user_id'])} for item in isBot.websiteData ]
         return make_response({"data":bot_data,"status":True}, 200)
     except Exception as e:
         
@@ -314,25 +343,22 @@ def delete_website_links(data):
         if not isBot:
             return {"message": "chatBot does not exists","status":False}
         else: 
-            bot_website =[{'_id': str(item['_id']), 'url': item['url'], 'user_id': item['user_id']} for item in isBot.websiteData]
+            bot_website =[{'_id': str(item['_id']), 'url': item['url'], 'user_id': item['user_id'],'length':item['length'],'vector_ids': item.get('vector_ids', [])} for item in isBot.websiteData]
             newdata[:] = [item for item in bot_website if item["_id"] != data['web_id']]
-           
+            deletedData = [item for item in bot_website if item["_id"] == data['web_id']]
+            # isBot.update(botTraining="Pending")
             isBot.websiteData=newdata
-            delete_embedding(isBot.key)
-            mylinks = [item["url"] for item in newdata]
-            text=getTexts(mylinks)
-            saveText(isBot.key,text)
-            textdata='\n'.join(item['text_data'] for item in isBot.text)
-            if (len(textdata)==0):
-                isBot.save() 
-                return {"message": "Website Link Removed Successfully_1","status":True}
+            delete_embedding_data(deletedData[0],isBot.key)
+            if(isBot.used_characters-deletedData[0]['length']>0):
+                isBot.used_characters-=deletedData[0]['length']
             else:
-                isBot.save()
-                resaveText(isBot.key,textdata)
-                return {"message": "Website Link Removed Successfully_2","status":True}
+                isBot.used_characters=0    
+            isBot.save() 
+            # mylinks = [item["url"] for item in newdata]
+            # text=getTexts(mylinks)
+            return make_response({"message":"Url Removed successfully","status":True,"RetrainBot":False}, 200)
     except Exception as e:
-      
-        return make_response({'message': str(e),"status":False})        
+        return make_response({'message': str(e),"status":False})     
 def add_chatbot_support(data):
     try:
        is_bot=chatBots.objects[:1](id=data['id'],user_id=session['user_id']).first()
@@ -355,7 +381,7 @@ def add_ChatBot(botdata):
         if is_bot:
             return {"message": "chatBot Already Exist","status":False} 
         elif is_free_bot:
-            return {"message": "Cant create Chatbot","status":False}
+            return {"message": "Cant create Chatbot ,please upgrade the free chatbot to paid to add a new one!","status":False}
         else:
             current_date = datetime.datetime.utcnow() 
             characters = string.ascii_letters + string.digits
@@ -377,6 +403,8 @@ def get_ChatBot(botdata):
         isBot = chatBots.objects[:1](id=botdata['id'],user_id=session['user_id']).first()
         if not isBot:
             return {"message": "User does not exists","status":False}
+        # client.delete_collection(name=isBot.key)
+        # return make_response({"message":"deleted","status":True}, 200)  
         else: 
             bot_data = {}
             bot_data['_id'] = str(isBot.id)
@@ -397,12 +425,17 @@ def get_ChatBot(botdata):
             bot_data['intro_message']=isBot.intro_message
             bot_data['theme']=isBot.theme
             bot_data['key']=isBot.key 
-            if isBot.avatar_image :
+            bot_data['botTraining']=isBot.botTraining
+            bot_data['enableSupport']=isBot.enableSupport
+            if isBot.useFaceBook:
+                bot_data['useFaceBook']=isBot.useFaceBook
+            if isBot.useWhatsApp:
+                bot_data['useWhatsApp']=isBot.useWhatsApp
+            if isBot.avatar_image:
                 bot_data['avatar_image']=os.environ.get('url')+isBot.avatar_image 
             bot_data['created'] = isBot.created.isoformat()
             return make_response({"data":bot_data,"status":True}, 200)   
     except Exception as e:
-       
         return make_response({'message': str(e)}, 404)
 def get_all_ChatBot():
     try:
@@ -434,24 +467,69 @@ def edit_ChatBot(editdata):
         myResponse=[]
         isBot = chatBots.objects[:1](id=editdata['id'],user_id=session['user_id']).first()
         if not isBot:
-            return {"message": "User does not exists","status":False}
+            return {"message": "Bot does not exists","status":False}
         else: 
-            isBot.update(name=editdata['name'],purpose=editdata['purpose'],intro_message=editdata['intro_message'])
+            if 'name' in editdata:
+                name=editdata['name']
+            else:
+                name=isBot.name
+            if 'purpose' in editdata:
+                purpose=editdata['purpose']
+            else:
+                name=isBot.purpose
+            if 'intro_message' in editdata:
+                intro_message=editdata['intro_message']
+            else:
+                if isBot.intro_message:
+                    intro_message=isBot.intro_message
+                else:
+                    intro_message=""
+            isBot.update(name=name,purpose=purpose,intro_message=intro_message)
             return make_response({'message': 'Succesfully Edited',"status":True}, 200) 
     except Exception as e:
-        
-        return make_response({'message': str(e)}, 404)
+        return make_response({'message': str(e),"status":False}, 404)
 def get_ChatBot_text(textData):
     try:
         isBot = chatBots.objects[:1](id=textData['id'],user_id=session['user_id']).first()
         if not isBot:
             return {"message": "chatBot does not exists","status":False}
         else: 
-            botData = [{'_id': str(item['_id']), 'text_data': item['text_data'], 'title': item['title'], 'user_id': item['user_id']} for item in isBot.text]
+            botData = [{'_id': str(item['_id']), 'text_data': item['text_data'], 'title': item['title'], 'length':item['length']} for item in isBot.text]
             return make_response({'data':botData ,"status":True}, 200) 
     except Exception as e:
        
         return make_response({'message': str(e)}, 404)    
+def get_chatbot_faqs(data):
+    try:
+        isBot = chatBots.objects[:1](id=data['id'],user_id=session['user_id']).first()
+        if not isBot:
+            return {"message": "chatBot does not exists","status":False}
+        else:
+            bot_faq = [{'_id': str(item['_id']),
+                'text': item['text'], 
+                'question': item['question'],
+                'answer': item['answer'],
+                'length':item['length'],
+                'vector_ids': item.get('vector_ids', [])  # Use item.get() to provide a default value
+                } for item in isBot.faqData]
+            return make_response({'data':bot_faq ,"status":True}, 200) 
+    except Exception as e:
+        return make_response({'message': str(e)}, 404) 
+def get_chatbot_doc(data):
+    try:
+        isBot = chatBots.objects[:1](id=data['id'],user_id=session['user_id']).first()
+        if not isBot:
+            return {"message": "chatBot does not exists","status":False}
+        else:
+            bot_doc = [{'_id': str(item['_id']),
+             'length': item['length'], 
+             'filename': item['filename'],
+             'length':item['length'],
+             'vector_ids': item.get('vector_ids', [])  # Use item.get() to provide a default value
+            } for item in isBot.docData]
+            return make_response({'data':bot_doc ,"status":True}, 200) 
+    except Exception as e:
+        return make_response({'message': str(e)}, 404) 
 def add_ChatBot_text(textData):
     try:
         myResponse=[]
@@ -466,22 +544,101 @@ def add_ChatBot_text(textData):
                     saveData={}
                     saveData['_id'] = ObjectId()
                     saveData['text_data'] = textData['text']
+                    saveData['length']=len(textData['text'])
                     saveData['title'] = textData['title']
-                    saveData['user_id'] = session['user_id']
-                    
                     isBot.text.append(saveData)
-                    isBot.used_characters=isBot.used_characters+len(textData['text'])
+                    # isBot.used_characters=isBot.used_characters+len(textData['text'])
                     isBot.save()    
-                    text_data_concatenated = textData['text']
-                    saveText(isBot.key,text_data_concatenated)
-                    return {"message": "ChatBot Text Added Successfully","status":True}
+                    isBot.update(botTraining="Pending")
+                    # text_data_concatenated = textData['text']
+                    # saveText(isBot.key,text_data_concatenated)
+                    return {"message": "ChatBot Text Added Successfully","status":True,'update_id':str(saveData['_id'])}
                 else:
                     return {"message": "Validity Expired","status":False}
             else:
-                return {'message': "Limit Exceeded","status":False}
+                return {'message': "You dont have enough token to train","status":False}
     except Exception as e:
       
-        return make_response({'message': str(e)}, 404)   
+        return make_response({'message': str(e),"status":False}, 404)   
+def train_bot_FAQ_byxl(data,id):
+    isBot = chatBots.objects[:1](id=id).first()
+    for mydatas in data:
+        mydatas['_id']=ObjectId()
+        vector_id=saveText(isBot.key,mydatas['text'])
+        mydatas['vector_ids']=vector_id
+        isBot.faqData.append(mydatas)
+    isBot.botTraining="Completed"
+    isBot.save()
+def add_chatbot_FAQ_byxl(data):
+        myResponse=[]
+        saveData={}
+        isBot = chatBots.objects[:1](id=data['id'],user_id=session['user_id']).first()
+        if not isBot:
+            return {"message": "chatBot does not exists","status":False}
+        else: 
+            # Assuming the Excel file is in XLSX format
+            
+            # Convert the DataFrame to a list of dictionaries
+            training_data=[]
+            for datas in data['data']:
+                training_object={}
+                training_object['text'] = f"Question: {datas['question']}\nAnswer: {datas['answer']}"
+                training_object ['question']=datas['question']
+                training_object['answer']=datas['answer']
+                training_object['length']=len(training_object['text'])
+                training_data.append(training_object)
+            total_length = 0
+            total_length = sum(item.get("length", 0) for item in training_data)
+            if(isBot.used_characters+total_length>isBot.allowed_characters):
+                return {"message": "You dont have enough token to train!","status":False}
+            else:   
+                isBot.update(botTraining="Pending")
+                return {"message": "ChatBot Text Added Successfully","status":True,'training_data':training_data,'bot_id':data['id']}
+def add_chatbot_doc(data):
+    try:
+        if 'file' not in data.files:
+            return jsonify({'message': 'No file part',"status":False})
+        isBot = chatBots.objects[:1](id=data.form.get('id'),user_id=session['user_id']).first()
+        if not isBot:
+            return {"message": "chatBot does not exists","status":False}
+        file = data.files['file']
+
+        if file.filename == '':
+            return jsonify({'message': 'No selected file',"status":False})
+        #current_time = str(datetime.datetime.now().timestamp())
+        filename = file.filename
+        if(file.filename.endswith('.pdf')):
+            text=pdfReader(file)
+        elif(file.filename.endswith('.doc') or file.filename.endswith('.docx')):
+            print(filename)
+            filename = secure_filename(f"{file.filename}")
+            path = os.path.join("assets/temp/", filename)
+            print(path)
+            file.save(path)
+            text=docuentReader(path)
+            if len(text)>0:
+                if os.path.exists(path):
+                    os.remove(path)
+        elif(file.filename.endswith('.xls') ):
+            text=xlReader(file)
+        elif(file.filename.endswith('.xlsx')):
+            text=xlsxReader(file)
+        else:
+            return jsonify({'message': 'Invalid file format',"status":False})
+        docData={}
+        docData['_id']=ObjectId()
+        docData['length']=len(text)
+        docData['filename']=filename
+        docData['vector_ids']=[]
+        if(isBot.used_characters+docData['length']>isBot.allowed_characters):
+                return {"message": "You dont have enough token to train!","status":False}
+        isBot.docData.append(docData)
+        isBot.save()    
+        isBot.update(botTraining="Pending")
+        return {"message": "ChatBot Text Added Successfully","status":True,'update_id':str(docData['_id']),'text':text,'bot_id':data.form.get('id')}
+    except Exception as e:
+        print(e)
+        return make_response({'message': str(e)}, 404) 
 def add_chatbot_avatar(textData):
     try:
         if 'file' not in textData.files:
@@ -496,7 +653,6 @@ def add_chatbot_avatar(textData):
         current_time = str(datetime.datetime.now().timestamp())
        
         filename = secure_filename(f"{session['user_id']}_{current_time}_{file.filename}")
-      
         if file:
             filename = os.path.join("assets/images/", filename)
             isBot.avatar_image=filename
@@ -513,29 +669,180 @@ def delete_ChatBot_text(textData):
         if not isBot:
             return {"message": "chatBot does not exists","status":False}
         else: 
-            bot_text = [{'_id': str(item['_id']), 'text_data': item['text_data'], 'title': item['title'], 'user_id': item['user_id']} for item in isBot.text]
+            bot_text = [{'_id': str(item['_id']), 'text_data': item['text_data'], 'title': item['title'], 'length':item['length'],'user_id': item['user_id'],'vector_ids':item['vector_ids']} for item in isBot.text]
             newdata[:] = [item for item in bot_text if item["_id"] != textData['text_id']]
+            thedata=[item for item in bot_text if item["_id"] == textData['text_id']]
+            print(thedata)
+            delete_embedding_data(thedata[0],isBot.key)
             isBot.text=newdata
-            newCount = sum(len(item['text_data']) for item in newdata)
-            isBot.used_characters=newCount
-            isBot.save()
-            textdata='\n'.join(item['text_data'] for item in isBot.text)
-            if (len(textdata)==0):
-                 return {"message": "ChatBot Text Removed Successfully","status":True}
+            # newCount = sum(len(item['text_data']) for item in newdata)
+            # isBot.used_characters=newCount
+            if(isBot.used_characters-len(thedata[0]['text'])>0):
+                isBot.used_characters-=len(thedata[0]['text_data'])
             else:
-                resaveText(isBot.key,textdata)
-                return {"message": "ChatBot Text Removed Successfully","status":True}
+                isBot.used_characters=0
+            isBot.save()
+            return {"message": "ChatBot Text Removed Successfully","status":True}
     except Exception as e:
        
-        return make_response({'message': str(e)}, 404)       
+        return make_response({'message': str(e)}, 404)     
+def delete_embedding_data(data,key):
+    print("in")
+    print(data['vector_ids'])
+    collection = client.get_or_create_collection(name=key)
+    for datas in data['vector_ids']:
+        collection.delete(datas)
+def add_chatbot_FAQ(data):
+        myResponse=[]
+        saveData={}
+        isBot = chatBots.objects[:1](id=data['id'],user_id=session['user_id']).first()
+        if not isBot:
+            return {"message": "chatBot does not exists","status":False}
+        else: 
+            current_time=datetime.datetime.utcnow()
+            text = f"Question: {data['question']}\nAnswer: {data['answer']}"
+            question=data['question']
+            answer=data['answer']
+            length=len(text)
+            if(isBot.used_characters+length>isBot.allowed_characters):
+                return {"message": "You dont have enough token to train!","status":False}
+            else:
+                id=ObjectId()
+                isBot.faqData.append({"_id":id,"text":text,"question":question,"answer":answer,"length":length,'vector_ids':[]})
+                isBot.save()    
+                isBot.update(botTraining="Pending")
+                return {"message": "ChatBot Text Added Successfully","status":True,'update_id':str(id),'text':text}
+
+def delete_bot_faq(data):
+    try:
+        newdata=[]
+        isBot = chatBots.objects[:1](id=data['id'],user_id=session['user_id']).first()
+        if not isBot:
+            return {"message": "chatBot does not exists","status":False}
+        else: 
+            bot_faq = [{'_id': str(item['_id']),
+             'text': item['text'], 
+             'question': item['question'],
+             'answer': item['answer'],
+             'length':item['length'],
+             'vector_ids': item.get('vector_ids', [])  # Use item.get() to provide a default value
+            } for item in isBot.faqData]
+            newdata[:] = [item for item in bot_faq if item["_id"] != data['faq_id']]
+            thedata=[item for item in bot_faq if item["_id"] == data['faq_id']]
+            print(thedata)
+            delete_embedding_data(thedata[0],isBot.key)
+            isBot.faqData=newdata
+            # newCount = sum(len(item['text_data']) for item in newdata)
+            # isBot.used_characters=newCount
+            if(isBot.used_characters-len(thedata[0]['text'])>0):
+                isBot.used_characters-=len(thedata[0]['text'])
+            else:
+                isBot.used_characters=0
+            isBot.save()
+            return {"message": "ChatBot faq Removed Successfully","status":True}
+    except Exception as e:
+       
+        return make_response({'message': str(e)}, 404)   
+def delete_bot_doc(data):
+    try:
+        newdata=[]
+        isBot = chatBots.objects[:1](id=data['id'],user_id=session['user_id']).first()
+        if not isBot:
+            return {"message": "chatBot does not exists","status":False}
+        else: 
+            bot_doc = [{'_id': str(item['_id']),
+             'length': item['length'], 
+             'filename': item['filename'],
+             'length':item['length'],
+             'vector_ids': item.get('vector_ids', [])  # Use item.get() to provide a default value
+            } for item in isBot.docData]
+            newdata[:] = [item for item in bot_doc if item["_id"] != data['doc_id']]
+            thedata=[item for item in bot_doc if item["_id"] == data['doc_id']]
+            delete_embedding_data(thedata[0],isBot.key)
+            isBot.docData=newdata
+            # newCount = sum(len(item['text_data']) for item in newdata)
+            # isBot.used_characters=newCount
+            if(isBot.used_characters-thedata[0]['length']>0):
+                isBot.used_characters-=thedata[0]['length']
+            else:
+                isBot.used_characters=0
+            isBot.save()
+            return {"message": "ChatBot faq Removed Successfully","status":True}
+    except Exception as e:
+       
+        return make_response({'message': str(e)}, 404)  
+def train_bot_faq(data,id,text):
+    try:
+        print("here")
+        isBot = chatBots.objects[:1](id=data['id']).first()
+        # delete_embedding(isBot.key)
+        # return False
+
+        bot_faq = [{'_id': str(item['_id']),
+             'text': item['text'], 
+             'question': item['question'],
+             'answer': item['answer'],
+             'length':item['length'],
+             'vector_ids': item.get('vector_ids', [])  # Use item.get() to provide a default value
+            } for item in isBot.faqData]
+        print(bot_faq)
+        vector_id=saveText(isBot.key,text)
+        print(vector_id)
+        new_bot_text=[{'_id': str(item['_id']),
+             'text': item['text'], 
+             'question': item['question'],
+             'answer': item['answer'],
+             'length':item['length'], 'vector_ids': vector_id} if item['_id'] == id else item for item in bot_faq]
+        isBot.used_characters+=len(text)
+        isBot.faqData=new_bot_text
+        isBot.botTraining="Completed"
+        isBot.save()
+    except Exception as e:
+            print(e)
+def train_bot_doc(data,id,text):
+    try:
+        print("here")
+        isBot = chatBots.objects[:1](id=data).first()
+        # delete_embedding(isBot.key)
+        # return False
+
+        bot_doc = [{'_id': str(item['_id']),
+             'length': item['length'], 
+             'filename': item['filename'],
+             'length':item['length'],
+             'vector_ids': item.get('vector_ids', [])  # Use item.get() to provide a default value
+            } for item in isBot.docData]
+        print(bot_doc)
+        vector_id=saveText(isBot.key,text)
+        print(vector_id)
+        new_bot_text=[{'_id': str(item['_id']),
+             'length': item['length'], 
+             'filename': item['filename'],'vector_ids': vector_id} if item['_id'] == id else item for item in bot_doc]
+        isBot.used_characters+=len(text)
+        isBot.docData=new_bot_text
+        isBot.botTraining="Completed"
+        isBot.save()
+    except Exception as e:
+            print(e)
+
 def get_history(data):
     try:
-      isUser = userChatHistory.objects[:1](email=data['email'],user_id=session['user_id'],chatbot_id=data['chatbot_id']).first()
+      if data['page']:
+            page=data['page']
+      else:
+            page=0  
+      per_page=10
+      skip = (page - 1) * per_page
+      isUser = userChatHistory.objects[:1](id=data['id'],user_id=session['user_id'],chatbot_id=data['chatbot_id']).first()
       if not isUser:
          return {"message": "NewUser","data":[],"status":True}    
       else:
          botHistory = [{'_id': str(item['_id']), 'question': item['question'], 'answer': item['answer'],'created':item['created']} for item in isUser.history]
-         return make_response({"data": botHistory,"status":True}) 
+         start_index = len(botHistory) - (page * per_page)
+         end_index = len(botHistory) - ((page - 1) * per_page)
+         # Slice the data to get the current page's data
+         myhistory = botHistory[start_index:end_index]
+         return make_response({"data": myhistory,"status":True}) 
     except Exception as e:
             
             return make_response({'message': str(e)}, 404) 
@@ -543,8 +850,13 @@ def get_chatBot_Bykey():
     try:
        
         theBot=session['myBot']
-        
-        return make_response({"data": theBot,"status":True}) 
+        # isValid=checkValidity(theBot['id'])
+        return make_response({"data": theBot,"status":True})
+        # if(isValid):
+        #     return make_response({"data": theBot,"status":True}) 
+        # else:
+        #     response="Thank you for visiting! Our chatbot is currently under development and will be ready soon. We appreciate your patience and can't wait to assist you when it's up and running. If you need immediate help, please contact our support team. Thank you!"
+        #     return make_response({"message":response,"status":True,"data": theBot})
     except Exception as e:
            
             return make_response({'message': str(e)}, 404) 
@@ -597,7 +909,7 @@ def get_chat_users(data):
         if not isBot:
             return {"message": "Chat does not exists","data":[],"status":False}
         else:
-           user_data= [{'id': str(item['id']), 'email': item['email']} for item in isBot]
+           user_data= [{'id': str(item['id']), 'title': item['title']} for item in isBot]
            return make_response({"data": user_data,"count":count,"status":True})
     except Exception as e:
             
@@ -621,17 +933,56 @@ def setup_facebook_data(data):
             return {"message": "chatBot does not exists","status":False}
         else:
             facebookData={}
-            facebookData['fbAppId']=data['fbAppId']
-            facebookData['fbAppSecret']=data['fbAppSecret']
-            facebookData['fbPageName']=data['fbPageName']
             facebookData['fbPageId']=data['fbPageId']
             facebookData['fbPageAccessToken']=data['fbPageAccessToken']
+            facebookData['url']=os.environ.get('facebook_url')+facebookData['fbPageId']
             isBot.facebookData=facebookData
             isBot.save()
             return {"message": "Successfully Added","status":True} 
     except Exception as e:
-           
+            print(e)
             return make_response({'message': str(e)}, 404)   
+def setup_whatsapp_data(data):
+    try:
+        isBot = chatBots.objects[:1](user_id=session['user_id'],id=data['id']).first()
+        if not isBot:
+            return {"message": "chatBot does not exists","status":False}
+        else:
+            whatsappData={}
+            whatsappData['waBusinessId']=data['waBusinessId']
+            whatsappData['accessToken']=data['accessToken']
+            whatsappData['phoneNumberId']=data['phoneNumberId']
+            responseData=getPhonenumber(data['phoneNumberId'],data['accessToken'])
+            if(responseData):
+                mobile = re.sub(r'[^a-zA-Z0-9]', '', responseData)
+                whatsappData['mobile']=mobile
+                whatsappData['url']=os.environ.get('whatsapp_url')+whatsappData['mobile']
+                isBot.useWhatsApp=True
+            else:
+                isBot.whatsappData=whatsappData
+                isBot.useWhatsApp=False
+                isBot.save()
+            return {"message": "Successfully Added","status":True} 
+    except Exception as e:
+           
+            return make_response({'message': str(e)}, 404)  
+def get_whatsapp_data(data):
+    try:
+        isBot = chatBots.objects[:1](user_id=session['user_id'],id=data['id']).first()
+        if not isBot:
+            return {"message": "chatBot does not exists","status":False}
+        else:
+            if isBot.whatsappData:
+                whatsappData={}
+                whatsappData['waBusinessId']=isBot.whatsappData['waBusinessId']
+                whatsappData['accessToken']=isBot.whatsappData['accessToken']
+                whatsappData['phoneNumberId']=isBot.whatsappData['phoneNumberId']
+                return make_response({"data":whatsappData,"status":True}, 200)
+            else:
+                return {"message": "Whatsapp not set up for this chatbot","status":False}
+    except Exception as e:
+            
+            return make_response({'message': str(e)}, 404)  
 def get_facebook_data(data):
     try:
         isBot = chatBots.objects[:1](user_id=session['user_id'],id=data['id']).first()
@@ -640,10 +991,6 @@ def get_facebook_data(data):
         else:
             if isBot.facebookData:
                 facebookData={}
-                
-                facebookData['fbAppId']=isBot.facebookData['fbAppId']
-                facebookData['fbAppSecret']=isBot.facebookData['fbAppSecret']
-                facebookData['fbPageName']=isBot.facebookData['fbPageName']
                 facebookData['fbPageId']=isBot.facebookData['fbPageId']
                 facebookData['fbPageAccessToken']=isBot.facebookData['fbPageAccessToken']
                 return make_response({"data":facebookData,"status":True}, 200)
@@ -652,3 +999,108 @@ def get_facebook_data(data):
     except Exception as e:
            
             return make_response({'message': str(e)}, 404)   
+def toggle_support(data):
+    try:
+        isBot = chatBots.objects[:1](user_id=session['user_id'],id=data['id']).first()
+        if not isBot:
+            return {"message": "chatBot does not exists","status":False}
+        else:
+            if((isBot.support_mobile) or (isBot.support_email) or (isBot.support_name)):
+                if(isBot.enableSupport):
+                    if isBot.enableSupport==True:
+                        isBot.enableSupport=False
+                        retData={"message": "ChatBot enquiry disabled","status":True}
+                    else:
+                        isBot.enableSupport=True
+                        retData={"message": "ChatBot enquiry enabled","status":True}
+                else:    
+                    isBot.enableSupport=True
+                    retData={"message": "ChatBot enquiry enabled","status":True}
+            else:
+                isBot.enableSupport=False
+                retData={"message": "Fill ChatBot enquiry to enable","status":False}
+        isBot.save()
+        return retData
+    except Exception as e:
+            return make_response({'message': str(e),"status":False}, 404)   
+def toggel_whatsapp(data):
+    try:
+        isBot = chatBots.objects[:1](user_id=session['user_id'],id=data['id']).first()
+        if not isBot:
+            return {"message": "chatBot does not exists","status":False}
+        else:
+            if('whatsappData' in isBot):
+                if(isBot.useWhatsApp):
+                    if isBot.useWhatsApp==True:
+                        isBot.useWhatsApp=False
+                        retData={"message": "ChatBot Whatsapp disabled","status":True}
+                    else:
+                        if 'whatsappData' in isBot :
+                            valid=getPhonenumber(isBot['whatsappData']['phoneNumberId'],isBot['whatsappData']['accessToken'])
+                            if(valid):
+                                isBot.useWhatsApp=True
+                                retData={"message": "ChatBot Whatsapp enabled","status":True}
+                            else:
+                                isBot.useWhatsApp=False
+                                retData={"message": "Improper settings to enable  Whatsapp","status":True}
+                        else:
+                            isBot.useWhatsApp=False
+                            retData={"message": "Improper settings to enable  Whatsapp","status":True}
+                else:    
+                    isBot.useWhatsApp=True
+                    retData={"message": "ChatBot Whatsapp enabled","status":True}
+            else:
+                isBot.useWhatsApp=False
+                retData={"message": "Fill whatsapp data to enable","status":False}
+        isBot.save()
+        return retData
+    except Exception as e:
+        return make_response({'message': str(e),"status":False}, 404)   
+def toggel_facebook(data):
+    try:
+        isBot = chatBots.objects[:1](user_id=session['user_id'],id=data['id']).first()
+        if not isBot:
+            return {"message": "chatBot does not exists","status":False}
+        else:
+            if('facebookData' in isBot):
+                if(isBot.useFaceBook):
+                    if isBot.useFaceBook==True:
+                        isBot.useFaceBook=False
+                        retData={"message": "ChatBot facebook disabled","status":True}
+                    else:
+                        isBot.useFaceBook=True
+                        retData={"message": "ChatBot facebook enabled","status":True}
+                else:    
+                    isBot.useFaceBook=True
+                    retData={"message": "ChatBot facebook enabled","status":True}
+            else:
+                isBot.useFaceBook=True
+                retData={"message": "Fill facebook data to enable","status":False}
+        isBot.save()
+        return retData
+    except Exception as e:
+            return make_response({'message': str(e),"status":False}, 404)   
+def getPhonenumber(phoneNumberId,token):
+    url="https://graph.facebook.com/v15.0/"+phoneNumberId
+    headers = {
+    'Content-Type': 'application/json',
+    'Authorization':'Bearer '+token
+    }
+    payload = json.dumps({
+    "messaging_product": "whatsapp"})
+    response = requests.request("GET", url, headers=headers,data=payload)
+    if response.status_code == 200:
+        json_data = json.loads(response.text)
+        return json_data['display_phone_number']
+    else:
+        return False
+def checkValidToken(token):
+    response = requests.get(f"https://graph.facebook.com/v13.0/debug_token", params={
+        "input_token": token
+    })
+
+    if response.status_code == 200:
+        data = response.json()
+        return data.get("data", {}).get("is_valid", False)
+    else:
+        return False

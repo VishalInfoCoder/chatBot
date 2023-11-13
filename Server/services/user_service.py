@@ -5,7 +5,9 @@ from utils.JwtToken import generate_token
 from flask import jsonify, make_response,Flask, render_template, request,session
 import os
 import datetime
-
+import random
+import string
+charset = string.ascii_uppercase + string.digits
 
 
 def verify_email(data):
@@ -22,8 +24,42 @@ def verify_email(data):
             return {"message": "User not found!","status":True}   
     except Exception as e:
         return make_response({'message': str(e)}, 404)        
-
-       
+def google_login(data):
+    try:
+        user = Users.objects[:1](email=data['email']).first()
+        if not user:
+            user=Users(email=data['email'],type="google",google_id=data['google_id'],role="ADMIN",is_Active=True,is_email_verified=True,name=data['name'])
+            user.save()
+        payload = {"email": user['email'], "user_id": str(user['id']),"role":user['role']}
+        secret = os.environ.get('TOKEN_SECRET')
+        token = generate_token(payload, secret)
+        return make_response({'token': token,"status":True}, 200)
+    except Exception as e:
+        return make_response({'message': str(e)}, 404)  
+def facebook_login(data):
+    try:
+        user = Users.objects[:1](email=data['email']).first()
+        if not user:
+            user=Users(email=data['email'],type="facebook",facebook_id=data['facebook_id'],role="ADMIN",is_Active=True,is_email_verified=True,name=data['name'])
+            user.save()
+        payload = {"email": user['email'], "user_id": str(user['id']),"role":user['role']}
+        secret = os.environ.get('TOKEN_SECRET')
+        token = generate_token(payload, secret)
+        return make_response({'token': token,"status":True}, 200)
+    except Exception as e:
+        return make_response({'message': str(e)}, 404)   
+def update_referal_code(data):
+        user = Users.objects[:1](id=data['id']).first()
+        referal_code=Users.objects[:1](referal_code=data['refered_by'],id__ne=data['id']).first()
+        if 'refered_by' not in user:
+            if referal_code :
+                user.refered_by=data['refered_by']
+                user.save()
+                return {"message": "Referal code added successfully!","status":True}
+            else:
+                return {"message": "Referal code not found!","status":False}
+        else:
+            return {"message": "Referal code already in use!","status":False}
 def signup_service(userdata):
     try:
         email_check = Users.objects[:1](email=userdata['email'])
@@ -34,13 +70,22 @@ def signup_service(userdata):
             email = userdata['email']
             # image = userdata['image']
             mobile = userdata['mobile']
-            address = userdata['address']
+            # address = userdata['address']
             role="ADMIN"
+            if('refered_by' in userdata):
+                refered_by=userdata['refered_by']
+                user.refered_by=refered_by.upper()
             password = encrypt_password(userdata['password'])
             user = Users(name=name, email=email,
-                        mobile=mobile, password=password,is_Active=1,role=role,is_email_verified=0,address=address)
+                        mobile=mobile, password=password,is_Active=1,role=role,is_email_verified=0,type="website")
             user.save()
             # content = "Please click the link below to verify Your Email:"
+            random_string = ''.join(random.choice(charset) for _ in range(2))
+            id=str(user.id)
+            my_code=user.name[:3]+str(id[:3])+random_string
+            user.referal_code=my_code
+            
+            user.save()
             mylink=os.environ.get('fronEndUrlMail')+"?token="+user.verify_id 
             # html = f"<h3>{content}</h3> <br>{link}"
             email_content = render_template(
@@ -118,7 +163,13 @@ def login_service(user_credentials):
             for user in email_check:
                 if(user['is_Active']==True):
                     if(user['is_email_verified']==True):
-                        payload = {"email": user['email'], "user_id": str(user['id']),"role":user['role']}
+                        if 'referal_code' not in user:
+                            random_string = ''.join(random.choice(charset) for _ in range(2))
+                            id=str(user.id)
+                            my_code=user.name[:3]+id[:3]+random_string
+                            user.referal_code=my_code.upper()
+                            user.save()
+                        payload = {"email": user['email'], "user_id": str(user['id']),"role":user['role'],"referal_code":user['referal_code']}
                         secret = os.environ.get('TOKEN_SECRET')
                         if compare_passwords(user_credentials['password'], user['password']):
                             token = generate_token(payload, secret)
@@ -130,7 +181,32 @@ def login_service(user_credentials):
                 else:
                     return make_response({'message': 'User is Inactive Please Contact Administration!',"status":False})
     except Exception as e:
-        return make_response({'message': str(e)}, 404)            
+        return make_response({'message': str(e)}, 404)      
+def superadmin_login(data):
+    try:
+        user = Users.objects[:1](email=data['email']).first()
+        if not user:
+            return {"message": "Email does not exists","status":False}
+        else:
+            if(user['role']=="SUPERADMIN"):
+                if(user['is_Active']==True):
+                    if(user['is_email_verified']==True):
+                        payload = {"email": user['email'], "user_id": str(user['id']),"role":user['role']}
+                        secret = os.environ.get('TOKEN_SECRET')
+                        if compare_passwords(data['password'], user['password']):
+                            token = generate_token(payload, secret)
+                            return make_response({'token': token,"status":True}, 200)
+                        else:
+                            return make_response({'message': 'Invalid password',"status":False}, 403)
+                    else:
+                        return make_response({'message': 'Please Verify Your email before loging in !',"status":False})     
+                else:
+                    return make_response({'message': 'User is Inactive Please Contact Administration!',"status":False})
+            else:
+                return make_response({'message': 'Invalid User',"status":False}, 403)
+    except Exception as e:
+        return make_response({'message': str(e)}, 404)   
+
 def edit_user(editdata): 
     try:
         is_user = Users.objects[:1](id=editdata['id'])
@@ -158,6 +234,8 @@ def get_user(viewdata):
                 user_data['name'] = user.name
                 user_data['email'] = user.email
                 user_data['mobile'] = user.mobile
+                if 'refered_by' in user:
+                    user_data['refered_by']=user.refered_by
                 myResponse.append(user_data)
                 if(len(myResponse)==1):
                     return make_response({"data":myResponse[0],"status":True}, 200)
@@ -166,25 +244,7 @@ def get_user(viewdata):
     except Exception as e:
        
         return make_response({'message': str(e)}, 404)
-def get_all_user(viewdata): 
-    try:
-        myResponse=[]
-        
-        is_user = Users.objects(role="ADMIN")
-        if not is_user:
-            return {"status": False, "message": "No Users Found"}
-        else: 
-            for user in is_user:
-                user_data = {}
-                user_data['_id'] = str(user.id)
-                user_data['name'] = user.name
-                user_data['email'] = user.email
-                user_data['mobile'] = user.mobile
-                myResponse.append(user_data)          
-        return make_response({"data":myResponse,"status":True}, 200)         
-    except Exception as e:
-       
-        return make_response({'message': str(e)}, 404)
+
 def update_userStatus(viewdata): 
     try:
         is_user = Users.objects[:1](id=viewdata['id'])

@@ -29,7 +29,29 @@ def validate_token_admin(func):
         try:
             payloads=jwt.decode(myPayload[1], secret, algorithms=["HS256"])
             print(payloads)
-            if(payloads['role']=="ADMIN"):
+            if(payloads['role']=="ADMIN" or payloads['role']=="SUPERADMIN"):
+                session['user_id'] = payloads['user_id']
+                return func(*args, **kwargs)
+            else:
+                return make_response({"message": "Invalid User","status":False}) 
+        except Exception as e: 
+            print(e)
+            return make_response({"message": "Invalid token provided","status":False})   
+    wrapper.__name__ = func.__name__
+    return wrapper
+def validate_token_superadmin(func):
+    secret = "qwertyuioplkmjnha5526735gbsgsg"
+    def wrapper(*args, **kwargs):
+        try:
+            token = request.headers['Authorization']
+            myPayload=token.split(" ")
+        except Exception as e:
+            return make_response({"message": "Token not provided"}, 403)
+        
+        try:
+            payloads=jwt.decode(myPayload[1], secret, algorithms=["HS256"])
+            print(payloads)
+            if(payloads['role']=="SUPERADMIN"):
                 session['user_id'] = payloads['user_id']
                 return func(*args, **kwargs)
             else:
@@ -76,6 +98,18 @@ def validate_apiKey(func):
                     bot_data['support_email']=isBot.support_email
                     bot_data['intro_message']=isBot.intro_message
                     bot_data['support_mobile']=isBot.support_mobile
+                    bot_data['enableSupport']=isBot.enableSupport
+                    
+                    if(isBot.facebookData):
+                        bot_data['useFaceBook']=isBot.useFaceBook
+                        bot_data['fb_url'] = isBot.facebookData.get('url', None)
+                    else:
+                        bot_data['useFaceBook']=False
+                    if(isBot.whatsappData):
+                        bot_data['useWhatsApp']=isBot.useWhatsApp
+                        bot_data['wa_url'] = isBot.whatsappData.get('url', None)
+                    else:
+                        bot_data['useWhatsApp']=False
                     session['myBot'] = bot_data
                     return func(*args, **kwargs)
                 else:

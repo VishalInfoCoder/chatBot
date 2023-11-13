@@ -1,6 +1,7 @@
 from model.user_transaction import User_transactions
 from model.plan import Plans
 from model.user_invoice import User_invoices
+from model.user import Users
 from model.chatbot import chatBots
 from flask import jsonify, make_response,session
 import os
@@ -17,7 +18,7 @@ def initiate_transaction(transaction_data):
             price=plan_data[0]['price']
             plan_id=transaction_data['plan_id']
             status="Pending"
-            Gstpercentage = 5
+            Gstpercentage = int(os.environ.get('Gstpercentage'))
             currency="INR"
             GstAmount = (price * Gstpercentage)/100
             total_amount =price +GstAmount
@@ -47,11 +48,16 @@ def get_PaymentSuccess(success_data):
         transaction_data=User_transactions.objects[:1](order_id=success_data['razorpay_order_id']).first()
         plan_data=Plans.objects[:1](id=transaction_data['plan_id']).first()
         invoice_data=User_invoices.objects[:1](user_id=transaction_data['user_id']).order_by('-inv_int').first() 
+        user_data=Users.objects[:1](id=transaction_data['user_id']).first() 
+        if 'refered_by' in user_data:
+            refered_by=user_data.refered_by
+        else:
+            refered_by=""
         if invoice_data:
             intInc=int(invoice_data["inv_int"])+1 
             inv_int=set_invoiceNumber(intInc)
             newInv="INV-"+str(current_year)+str(inv_int)
-            create_user_invoice=User_invoices(chatbot_id=transaction_data['chatbot_id'],user_id=transaction_data['user_id'],transaction_id=transaction_data['id'],total_amount=transaction_data['total_amount'],basic_amount=plan_data['price'],tax_percentage='5',total_tax_values=00000000.1,cgst=2.5,sgst=2.5,invoice_number=newInv,year=str(current_year),inv_int=intInc,plan_id=plan_data['id'],payment_details=payment)
+            create_user_invoice=User_invoices(chatbot_id=transaction_data['chatbot_id'],user_id=transaction_data['user_id'],transaction_id=transaction_data['id'],total_amount=transaction_data['total_amount'],basic_amount=plan_data['price'],tax_percentage='5',total_tax_values=00000000.1,cgst=2.5,sgst=2.5,invoice_number=newInv,year=str(current_year),inv_int=intInc,plan_id=plan_data['id'],payment_details=payment,refered_by=refered_by)
             create_user_invoice.save()
             transaction_data.update(status='paid')
             updateChatBot(transaction_data['chatbot_id'],plan_data)
@@ -59,7 +65,7 @@ def get_PaymentSuccess(success_data):
             intInc=1 
             inv_int=set_invoiceNumber(intInc)
             newInv="INV-"+str(current_year)+str(inv_int)
-            create_user_invoice=User_invoices(chatbot_id=transaction_data['chatbot_id'],user_id=transaction_data['user_id'],transaction_id=transaction_data['id'],total_amount=transaction_data['total_amount'],basic_amount=plan_data['price'],tax_percentage='5',total_tax_values=00000000.1,cgst=2.5,sgst=2.5,invoice_number=newInv,year=str(current_year),inv_int=intInc,plan_id=plan_data['id'],payment_details=payment)
+            create_user_invoice=User_invoices(chatbot_id=transaction_data['chatbot_id'],user_id=transaction_data['user_id'],transaction_id=transaction_data['id'],total_amount=transaction_data['total_amount'],basic_amount=plan_data['price'],tax_percentage='5',total_tax_values=00000000.1,cgst=2.5,sgst=2.5,invoice_number=newInv,year=str(current_year),inv_int=intInc,plan_id=plan_data['id'],payment_details=payment,refered_by=refered_by)
             create_user_invoice.save()   
             transaction_data.update(status='paid')
             updateChatBot(transaction_data['chatbot_id'],plan_data)
@@ -70,8 +76,6 @@ def get_PaymentSuccess(success_data):
         return {'message': str(e),"status":False}
 
 def razorPayInitiate(transaction_details):
-    
-
     # Initialize Razorpay client with your API Key and Secret Key
     client = razorpay.Client(auth=(os.environ.get('razor_key'), os.environ.get('razor_secret')))
     # Create a payment order
@@ -157,8 +161,23 @@ def view_all_transactions(userdata):
             page=0  
         per_page=10      
         skip = (page - 1) * per_page
-        data=User_invoices.objects(user_id=session['user_id'],chatbot_id=userdata['chatbot_id']).skip(skip).limit(per_page)
-        total_count = User_invoices.objects(user_id=session['user_id'],chatbot_id=userdata['chatbot_id']).count()
+        today_date = datetime.datetime.now()
+        if 'fromDate' in userdata:
+            from_date = datetime.datetime.strptime(userdata['fromDate'], '%Y-%m-%d').replace(hour=0, minute=0, second=0, microsecond=0)
+        else:
+            from_date = today_date.replace(hour=0, minute=0, second=0, microsecond=0)
+        if 'toDate' in userdata:
+            to_date = datetime.datetime.strptime(userdata['toDate'], '%Y-%m-%d').replace(hour=23, minute=59, second=59, microsecond=999)  
+        else: 
+            to_date = today_date.replace(hour=23, minute=59, second=59, microsecond=999)
+        query = {
+        'user_id': session['user_id'],
+        'chatbot_id': userdata['chatbot_id'],
+        'created__gte': from_date,
+        'created__lte': to_date
+         }
+        data=User_invoices.objects(**query).skip(skip).limit(per_page)
+        total_count = User_invoices.objects(**query).count()
         myResponse.extend([{'_id':str(transaction_data.id),'user_id': str(transaction_data.user_id), 'total_amount': transaction_data.total_amount, 'basic_amount': transaction_data.basic_amount, 'tax_percentage': transaction_data.tax_percentage, 'total_tax_values': transaction_data.total_tax_values, 'cgst': transaction_data.cgst,'sgst': transaction_data.sgst, 'invoice_number': transaction_data.invoice_number,'payment_details': transaction_data.payment_details, 'created': transaction_data.created} for transaction_data in data])
         return make_response({"data":myResponse,"count":total_count,"status":True}, 200)
     except Exception as e:

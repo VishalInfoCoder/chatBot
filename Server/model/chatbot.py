@@ -9,13 +9,17 @@ class chatBots(Document):
     text = ListField(DictField(
         _id=ObjectIdField(),
         text_data=StringField(),
+        length=IntField(),
         user_id=ObjectIdField(),
-        title=StringField()
+        title=StringField(),
+        vector_ids=ListField()
     ))
     websiteData=ListField(DictField(
         _id=ObjectIdField(),
         url=StringField(),
         user_id=ObjectIdField(),
+        length=IntField(),
+        vector_ids=ListField()
     ))
     validityStartDate=DateTimeField(null=True)
     validityEndDate=DateTimeField(null=True)
@@ -32,12 +36,39 @@ class chatBots(Document):
     plan_name=StringField(max_length=40)
     theme=StringField(max_length=40)
     intro_message=StringField()
+    botTraining=StringField()
     facebookData=DictField(
-        fbAppId=StringField(),
-        fbAppSecret=StringField(),
-        fbPageName=StringField(),
+        # fbAppId=StringField(),
+        # fbAppSecret=StringField(),
+        # fbPageName=StringField(),
         fbPageId=StringField(),
         fbPageAccessToken=StringField(),
+        url=StringField()
+
     )
+    whatsappData=DictField(
+        waBusinessId=StringField(),
+        accessToken=StringField(),
+        phoneNumberId=StringField(),
+        mobile=StringField(),
+        url=StringField()
+    )
+    faqData=ListField(DictField(
+        _id=ObjectIdField(),
+        question=StringField(),
+        answer=StringField(),
+        text=StringField(),
+        length=IntField(),
+        vector_ids=ListField()
+    ))
+    docData=ListField(DictField(
+        _id=ObjectIdField(),
+        filename=StringField(),
+        length=IntField(),
+        vector_ids=ListField()
+    ))
+    useFaceBook=BooleanField(default=False)
+    useWhatsApp=BooleanField(default=False)
+    enableSupport=BooleanField(default=False)
     created = DateTimeField(default=datetime.datetime.utcnow)
     updated = DateTimeField(default=datetime.datetime.utcnow) 
